@@ -1,0 +1,40 @@
+/* Studio (admin) — designed at 1440×900 */
+.studio { min-height: 100vh; display: grid; grid-template-columns: 240px minmax(0, 1fr); }
+.snav { padding: 28px 18px; background: var(--bg-side); border-right: 1px solid var(--surface-2); display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; height: 100vh; }
+.snav .logo { display: flex; align-items: center; gap: 10px; padding: 0 10px 22px; font: 800 20px var(--display); }
+.snav button { justify-content: flex-start; border: 0; border-radius: 10px; min-height: 44px; padding: 0 12px; color: var(--muted); }
+.snav button[aria-current="page"] { background: var(--surface-2); color: var(--text); }
+.snav .who { margin-top: auto; padding: 12px; border-radius: 12px; background: var(--surface); font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 8px; }
+.sview { display: grid; grid-template-columns: minmax(0, 1fr) 400px; min-height: 100vh; }
+.smain { padding: 28px 32px; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.saside { padding: 28px 24px; background: var(--surface); border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 16px; }
+.saside input, .saside select { background: var(--bg); }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: end; }
+.drop { padding: 14px; border-radius: 12px; border: 2px dashed var(--line); color: var(--muted); font-size: 14px; text-align: center; cursor: pointer; display: block; }
+.drop:hover, .drop:focus-within { border-color: var(--gold); color: var(--text); }
+.drop input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.cover-pick { display: flex; gap: 14px; align-items: center; }
+.cover-pick .drop { width: 96px; height: 96px; padding: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+.cover-pick img { width: 100%; height: 100%; object-fit: cover; }
+.cam { position: relative; height: 440px; border-radius: 20px; background: var(--stage); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.cam video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.cam .rec { position: absolute; top: 18px; left: 18px; }
+.cam .hint { position: absolute; bottom: 18px; left: 18px; color: var(--faint); font-size: 14px; }
+.cam .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 800 96px var(--display); text-shadow: 0 6px 0 var(--bg); pointer-events: none; }
+.take { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--bg); }
+.take .n { font: 800 20px var(--display); width: 22px; }
+.take .bar { height: 6px; }
+.phone-state { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; }
+.timeline { display: flex; gap: 3px; height: 64px; }
+.timeline button { flex: 1 1 0; min-width: 4px; min-height: 0; height: 100%; padding: 0; border: 0; border-radius: 4px; }
+.timeline button[aria-pressed="true"] { outline: 3px solid var(--text); outline-offset: 2px; }
+.legend { display: flex; gap: 18px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.icons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.icons button { min-height: 48px; padding: 0; background: var(--bg); }
+.icons button[aria-pressed="true"] { background: var(--gold); color: var(--bg); border-color: var(--gold); }
+.check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+tr.sel td { background: var(--surface-2); }
+tbody tr { cursor: pointer; }
+.login { max-width: 420px; margin: 12vh auto; }
+@media (max-width: 1150px) { .sview { grid-template-columns: 1fr; } .saside { border-left: 0; border-top: 1px solid var(--line); } }

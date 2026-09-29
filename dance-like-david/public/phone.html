@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#140C26">
+<title>Dance Like David</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/phone.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<main class="phone">
+  <div class="alert" id="netAlert" hidden role="status"></div>
+
+  <!-- join -->
+  <section id="v-join">
+    <div class="logo"><span id="logoIcon"></span><h1>Dance Like David</h1><p class="muted">Enter the code on the big screen</p></div>
+    <form id="joinForm" class="stack" style="gap:24px" novalidate>
+      <fieldset class="stack" style="border:0;padding:0;margin:0;gap:10px">
+        <legend class="muted" style="font-size:14px;font-weight:600;padding:0;margin-bottom:10px">Room code</legend>
+        <div class="digits" id="digits"></div>
+      </fieldset>
+      <label class="field">Your name<input id="name" maxlength="20" autocomplete="nickname" placeholder="What should the screen call you?"></label>
+      <div class="acct" id="acct"></div>
+      <p class="error" id="joinErr" role="alert"></p>
+      <div class="push">
+        <button class="btn-primary btn-lg btn-block" id="joinBtn" type="submit">Join the dance</button>
+        <p class="fine">Your phone will ask to use motion sensors. Keep this page open while you dance.</p>
+        <p class="fine">No big screen? <a href="/lab">Practice moves alone in Move Lab</a></p>
+      </div>
+    </form>
+  </section>
+
+  <!-- account -->
+  <section id="v-auth" hidden>
+    <div class="topbar"><button class="icon-btn" data-back aria-label="Back"></button><h1 style="font-size:24px">Your account</h1><span style="width:44px"></span></div>
+    <div class="seg-tabs" role="tablist"><button role="tab" aria-selected="true" data-auth="login">Sign in</button><button role="tab" aria-selected="false" data-auth="register">Create account</button></div>
+    <form id="authForm" class="stack" style="gap:16px" novalidate>
+      <label class="field" id="dnField" hidden>Display name<input id="displayName" maxlength="20" autocomplete="nickname"></label>
+      <label class="field">Username<input id="username" maxlength="24" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+      <label class="field">Password<input id="password" type="password" autocomplete="current-password"></label>
+      <p class="error" id="authErr" role="alert"></p>
+      <button class="btn-primary btn-lg btn-block" id="authBtn" type="submit">Sign in</button>
+      <p class="fine">Accounts keep your scores, streaks and leaderboard spot. You can always dance as a guest.</p>
+    </form>
+  </section>
+
+  <!-- grip check -->
+  <section id="v-grip" hidden>
+    <div class="spread"><span class="muted" style="font-size:14px;font-weight:600">Step 2 of 2</span><span class="chip tone-teal" id="gripRoom"></span></div>
+    <h1 style="font-size:34px">Hold it like this</h1>
+    <div class="grip-art" id="gripArt"></div>
+    <ol class="steps-list">
+      <li><span class="n">1</span>Right hand, like a microphone</li>
+      <li><span class="n">2</span>Upright, screen facing you</li>
+      <li><span class="n">3</span>Same grip for the whole song</li>
+    </ol>
+    <div class="push" style="align-items:center">
+      <span id="gripMsg" style="font-weight:700;min-height:1.4em;text-align:center"></span>
+      <button class="btn-primary btn-lg btn-block" id="gripBtn">I’m holding it</button>
+    </div>
+  </section>
+
+  <!-- waiting -->
+  <section id="v-wait" hidden>
+    <div class="spread"><span class="chip tone-teal" id="waitRoom"></span><span class="sync" id="syncPill"><span class="dot"></span><span>–</span></span></div>
+    <div class="big" id="waitBig"></div>
+    <div class="row" id="waitLinks" style="justify-content:center"></div>
+  </section>
+
+  <!-- dancing -->
+  <section id="v-dance" hidden style="gap:16px">
+    <div class="spread"><div class="stack" style="gap:0"><b id="dSong"></b><span class="muted" style="font-size:13px" id="dTime"></span></div><span class="sync" id="dSync"><span class="dot"></span><span>–</span></span></div>
+    <div class="bar" style="height:6px"><span id="dProg"></span></div>
+    <div class="alert" id="dAlert" hidden role="status"></div>
+    <div class="big"><span class="grade" id="dGrade" aria-live="polite"></span><span class="sub" id="dStreak"></span><span class="muted" id="dTip" style="font-size:15px;max-width:320px;min-height:2.6em"></span></div>
+    <div class="tiles" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div><span>Score</span><b id="dScore">0</b></div><div><span>Accuracy</span><b id="dAcc">–</b></div><div><span>Place</span><b id="dPlace">–</b></div></div>
+    <div class="next" id="dNext"></div>
+  </section>
+
+  <!-- results -->
+  <section id="v-results" hidden></section>
+
+  <!-- practice -->
+  <section id="v-practice" hidden></section>
+
+  <!-- profile -->
+  <section id="v-profile" hidden></section>
+
+  <!-- leaderboard -->
+  <section id="v-board" hidden></section>
+</main>
+<script type="module" src="/phone.js"></script>
+</body>
+</html>

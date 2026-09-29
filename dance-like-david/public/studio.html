@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#140C26">
+<title>Studio — Dance Like David</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/studio.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<form id="login" class="card stack login" style="gap:16px">
+  <h1 style="font-size:32px">Studio sign-in</h1>
+  <p class="muted">Only the super admin records and publishes songs.</p>
+  <label class="field">Admin password<input id="pass" type="password" autocomplete="current-password" required></label>
+  <p class="error" id="loginErr" role="alert"></p>
+  <button class="btn-primary btn-lg">Sign in</button>
+</form>
+
+<div class="studio" id="app" hidden>
+  <nav class="snav" aria-label="Studio">
+    <div class="logo" id="logo">Studio</div>
+    <button data-view="songs" aria-current="page">Songs</button>
+    <button data-view="record" disabled>Record</button>
+    <button data-view="moves" disabled>Moves &amp; publish</button>
+    <a class="btn" href="/screen" target="_blank" rel="noopener" style="justify-content:flex-start;border:0;color:var(--muted);padding:0 12px">Open big screen</a>
+    <div class="who"><span>Signed in as <b style="color:var(--text)">Super admin</b></span><span id="curSong"></span><button id="logout" style="min-height:36px">Sign out</button></div>
+  </nav>
+
+  <!-- songs -->
+  <div class="sview" id="v-songs">
+    <main class="smain">
+      <div class="spread"><h1 style="font-size:36px">Songs</h1><div class="row" id="songFilters"></div></div>
+      <table><thead><tr><th>Song</th><th>Status</th><th>Takes</th><th>Level</th><th>Plays</th><th><span class="sr">Actions</span></th></tr></thead><tbody id="songRows"></tbody></table>
+    </main>
+    <aside class="saside">
+      <form id="songForm" class="stack" style="gap:16px" novalidate>
+        <div class="spread"><h2 style="font-size:24px;font-weight:700" id="formTitle">New song</h2><button type="button" id="formNew" hidden>New song</button></div>
+        <div class="cover-pick">
+          <label class="drop" id="coverDrop"><input type="file" id="cover" accept="image/png,image/jpeg,image/webp"><span>Cover<br>image</span></label>
+          <span class="muted" style="font-size:14px;line-height:1.45">Square, at least 600&nbsp;px. Shown on the TV library and phones.</span>
+        </div>
+        <label class="field">Title<input id="title" maxlength="100" required placeholder="Song title"></label>
+        <label class="field">Artist<input id="artist" maxlength="100" placeholder="Artist or group"></label>
+        <div class="two">
+          <label class="field">Genre<select id="genre"><option>K-pop</option><option>Pop</option><option>Afrobeats</option><option>Worship</option><option>Kids</option><option>Other</option></select></label>
+          <label class="field">Difficulty<select id="difficulty"><option>Easy</option><option selected>Medium</option><option>Hard</option></select></label>
+        </div>
+        <div class="two">
+          <label class="field">BPM<input id="bpm" type="number" min="40" max="240" step="0.01" required></label>
+          <button type="button" id="tapBtn">Tap tempo</button>
+        </div>
+        <div class="two">
+          <label class="field">Beats per move<select id="bpmv"><option>2</option><option selected>4</option><option>8</option></select></label>
+          <label class="field">First beat (ms)<input id="first" type="number" min="0" value="0"></label>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="family" checked> Family-friendly</label>
+          <label class="check"><input type="checkbox" id="featured"> Feature on the TV</label>
+        </div>
+        <label class="drop" id="audioDrop"><input type="file" id="audio" accept="audio/*"><span id="audioLabel">Choose audio file (mp3, m4a, wav)</span></label>
+        <p class="muted" style="font-size:13px;line-height:1.45">Private rooms: use audio you own. Before this server is public, commercial K-pop and pop tracks need a license — use royalty-free music or tracks with the artist’s permission.</p>
+        <p class="error" id="formErr" role="alert"></p>
+        <button class="btn-primary btn-lg" id="formBtn">Create and start recording</button>
+      </form>
+    </aside>
+  </div>
+
+  <!-- record -->
+  <div class="sview" id="v-record" hidden>
+    <main class="smain">
+      <div class="spread" style="align-items:flex-end"><div><span class="muted" style="font-size:14px">Recording</span><h1 style="font-size:32px;margin-top:2px" id="recTitle"></h1></div><span class="muted" id="recMeta" style="font-size:14px"></span></div>
+      <div class="cam" id="cam"><div id="camFallback" class="stack" style="align-items:center;color:var(--faint)"></div><span class="rec" id="recChip"></span><span class="hint">Webcam · stand 2–3 m back so your whole body is in frame</span><div class="overlay" id="overlay"></div></div>
+      <div class="bar"><span id="recProg" style="background:var(--coral)"></span></div>
+      <div class="row">
+        <label for="recLen" class="muted" style="font-weight:600;font-size:14px">Length</label>
+        <select id="recLen" style="width:auto"><option value="full">Full song</option><option value="15000">First 15 s (quick test)</option><option value="30000">First 30 s</option><option value="60000">First 60 s</option></select>
+        <button id="camBtn"></button>
+        <button id="testBtn" style="min-height:52px" disabled title="Dance the song yourself and see how every move scores against the takes so far">Test run</button>
+        <button class="btn-rec btn-lg" id="recBtn" disabled>Record take</button>
+        <button class="btn-danger btn-lg" id="cancelBtn" hidden>Stop take</button>
+      </div>
+      <p class="error" id="recErr" role="alert"></p>
+      <div id="testPanel" class="stack" hidden></div>
+    </main>
+    <aside class="saside">
+      <div class="stack" style="gap:8px">
+        <span class="muted" style="font-size:13px;font-weight:600">Recorder phone</span>
+        <div class="phone-state" id="phoneState"></div>
+        <span class="muted" style="font-size:13px">Open <b id="joinUrl" style="color:var(--text)"></b> on your phone and enter <b style="color:var(--gold);font-size:16px" id="roomCode">····</b></span>
+      </div>
+      <div class="spread"><h2 style="font-size:20px;font-weight:700">Takes</h2><span class="muted" style="font-size:13px">Aim for 3–5</span></div>
+      <div class="stack" id="takes" style="gap:10px"></div>
+      <p id="takeNote" class="tile" hidden style="background:var(--gold-bg);font-size:14px;line-height:1.45"></p>
+      <button class="btn-primary btn-lg" id="toMoves" style="margin-top:auto">Review moves</button>
+    </aside>
+  </div>
+
+  <!-- moves -->
+  <div class="sview" id="v-moves" hidden>
+    <main class="smain">
+      <div><span class="muted" style="font-size:14px" id="movesSub"></span><h1 style="font-size:32px;margin-top:2px">Moves</h1></div>
+      <div class="stack" style="gap:8px">
+        <div class="timeline" id="timeline" role="group" aria-label="Moves timeline"></div>
+        <div class="spread muted" style="font-size:12px" id="timeTicks"></div>
+        <div class="legend"><span><i style="background:var(--teal)"></i>Consistent</span><span><i style="background:var(--gold)"></i>Loose, scored leniently</span><span><i style="background:var(--surface-2)"></i>Rest, not scored</span></div>
+      </div>
+      <div style="overflow:auto;max-height:52vh"><table><thead><tr><th>#</th><th>Move</th><th>Time</th><th>Consistency</th><th>Players miss it</th></tr></thead><tbody id="moveRows"></tbody></table></div>
+    </main>
+    <aside class="saside">
+      <span class="muted" style="font-size:13px;font-weight:600" id="mvHead"></span>
+      <label class="field">Name shown to players<input id="mvName" maxlength="40"></label>
+      <div class="stack" style="gap:8px"><span class="muted" style="font-size:13px;font-weight:600">Pictogram</span><div class="icons" id="mvIcons"></div></div>
+      <div class="stack" style="gap:8px">
+        <div class="spread"><label for="mvStrict" class="muted" style="font-size:13px;font-weight:600">Strictness</label><span id="mvStrictLabel" style="font-size:13px"></span></div>
+        <input type="range" id="mvStrict" min="0" max="100" step="5">
+        <div class="spread muted" style="font-size:12px"><span>Forgiving</span><button id="mvAuto" style="min-height:28px;font-size:12px;padding:0 10px">Reset to auto</button><span>Strict</span></div>
+      </div>
+      <div class="tile stack" style="background:var(--bg);gap:8px" id="checklist"></div>
+      <p class="error" id="pubErr" role="alert"></p>
+      <button class="btn-primary btn-lg" id="publishBtn" style="margin-top:auto">Publish to library</button>
+    </aside>
+  </div>
+</div>
+<script type="module" src="/studio.js"></script>
+</body>
+</html>

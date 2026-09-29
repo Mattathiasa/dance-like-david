@@ -1,0 +1,16 @@
+# Render.com blueprint: one web service with a persistent disk for songs, takes, accounts and scores.
+services:
+  - type: web
+    name: dance-like-david
+    runtime: docker
+    plan: starter            # persistent disks need a paid plan
+    healthCheckPath: /api/health
+    envVars:
+      - key: ADMIN_PASSWORD
+        sync: false          # set it in the dashboard
+      - key: DATA_DIR
+        value: /data
+    disk:
+      name: ddl-data
+      mountPath: /data
+      sizeGB: 5

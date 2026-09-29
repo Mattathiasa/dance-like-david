@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#140C26">
+<title>Dance Like David — Big screen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/tv.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body class="tv">
+<div class="tv-wrap" id="chrome">
+  <header class="tv-head">
+    <a class="brand" href="/" id="brand"><b>Dance Like David</b></a>
+    <nav class="tv-nav" aria-label="Main">
+      <button data-nav="library" aria-current="page">Songs</button>
+      <button data-nav="board">Leaderboard</button>
+      <button data-nav="howto">How to play</button>
+    </nav>
+    <div class="room-pill" aria-live="polite">
+      <span class="muted">Room</span><span class="code" id="roomCode">····</span>
+      <span class="sep"></span><span id="dancerCount">No dancers yet</span>
+    </div>
+  </header>
+  <div class="banner" id="netBanner" hidden role="status"></div>
+
+  <!-- song library -->
+  <section id="v-library" class="lib" aria-label="Song library">
+    <article class="featured" id="featured"></article>
+    <div class="stack" style="gap:18px;min-width:0">
+      <div class="lib-tools">
+        <label class="search"><span class="sr">Search songs</span><span id="searchIcon"></span><input id="q" placeholder="Search songs or artists" autocomplete="off"></label>
+        <label class="switch"><input type="checkbox" id="familyOnly"><span class="track"></span>Family-friendly</label>
+      </div>
+      <div class="genres" id="genres" role="group" aria-label="Genre"></div>
+      <div class="song-grid" id="songGrid"></div>
+    </div>
+  </section>
+
+  <!-- lobby -->
+  <section id="v-lobby" class="lobby" hidden aria-label="Lobby">
+    <div class="lobby-main">
+      <button class="back" data-nav="library" id="lobbyBack"></button>
+      <div class="hero" id="lobbyHero"></div>
+      <div class="stack" style="gap:14px">
+        <h2 class="eyebrow">Game mode</h2>
+        <div class="modes" id="modes" role="group" aria-label="Game mode"></div>
+      </div>
+      <div class="row" style="margin-top:auto;gap:20px">
+        <button class="btn-primary btn-xl" id="startBtn" disabled></button>
+        <span class="muted" id="startNote" style="font-size:16px"></span>
+      </div>
+    </div>
+    <aside class="card stack" style="gap:20px">
+      <div class="join-box">
+        <div class="qr" id="qr"></div>
+        <div class="stack" style="gap:4px">
+          <span class="muted">Scan or enter code</span>
+          <span class="big-code" id="bigCode">····</span>
+          <span class="muted" id="joinUrl" style="font-size:14px;word-break:break-all"></span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="spread"><h2 style="font-size:22px;font-weight:700">Dancers</h2><span class="muted" id="dancerSlots">0 / 8</span></div>
+      <div class="dancers" id="dancers"></div>
+      <button id="shuffleBtn" hidden>Shuffle teams</button>
+    </aside>
+  </section>
+
+  <!-- results -->
+  <section id="v-results" class="results" hidden aria-label="Results">
+    <div class="stack" style="gap:20px">
+      <div><span class="muted" id="resSub"></span><h1 id="resTitle" style="font-size:64px;margin-top:4px"></h1></div>
+      <div class="podium" id="podium"></div>
+      <div class="row" id="resRest"></div>
+    </div>
+    <aside class="card stack" style="gap:18px">
+      <div class="banner" id="recordBadge" hidden></div>
+      <h2 id="resMovesTitle" style="font-size:22px;font-weight:700"></h2>
+      <div class="breakdown" id="breakdown"></div>
+      <div class="spread muted" style="padding-top:6px;border-top:1px solid var(--line)"><span>Longest streak</span><b id="resStreak" style="color:var(--text)"></b></div>
+      <div class="stack" style="margin-top:auto;gap:10px">
+        <button class="btn-primary btn-lg" id="againBtn">Dance it again</button>
+        <button class="btn-lg" id="otherBtn">Choose another song</button>
+      </div>
+    </aside>
+  </section>
+
+  <!-- leaderboard -->
+  <section id="v-board" class="board" hidden aria-label="Leaderboard">
+    <h1 style="font-size:44px">Leaderboard</h1>
+    <label class="field">Song<select id="lbSong"></select></label>
+    <div class="tabs" role="tablist" id="lbTabs">
+      <button role="tab" aria-selected="true" data-period="all">All time</button>
+      <button role="tab" aria-selected="false" data-period="week">This week</button>
+    </div>
+    <div class="stack" id="lbRows" style="gap:8px"></div>
+  </section>
+
+  <!-- how to play -->
+  <section id="v-howto" class="stack" hidden aria-label="How to play" style="gap:24px">
+    <h1 style="font-size:44px">How to play</h1>
+    <div class="steps">
+      <div class="step"><span class="n">1</span><h3>Join on your phone</h3><p class="muted">Scan the QR code or open the link and type the 4-digit room code. Sign in to keep your scores.</p></div>
+      <div class="step"><span class="n">2</span><h3>Hold it like a mic</h3><p class="muted">Phone in your right hand, upright, screen facing you. Keep that grip for the whole song.</p></div>
+      <div class="step"><span class="n">3</span><h3>Follow the dancer</h3><p class="muted">Copy the video. Your phone scores every move: Perfect, Good, OK or Miss. Wild shaking doesn’t count.</p></div>
+    </div>
+    <div class="card stack" style="max-width:640px">
+      <h3>Screen settings</h3>
+      <label class="field">Speaker delay (ms) — raise it if moves feel late on Bluetooth speakers or a TV
+        <input type="number" id="latency" step="10" min="0" max="1000" style="max-width:160px"></label>
+      <button id="fullBtn" style="align-self:flex-start">Go full screen</button>
+    </div>
+  </section>
+</div>
+
+<!-- gameplay (solo + teams) -->
+<section id="v-play" class="stage-view solo" hidden aria-label="Gameplay">
+  <div class="stage" id="stage"><video id="video" muted playsinline preload="auto"></video><span class="figure-hint" id="noVideoHint" hidden>No reference video for this song — follow the move cards</span></div>
+  <div class="song-chip" id="songChip"></div>
+  <div class="team-head" id="teamHead" hidden></div>
+  <div class="strip-wrap"><div class="strip" id="strip"></div><div class="bar"><span id="progress"></span></div></div>
+  <aside class="side" id="side"></aside>
+  <div class="team-foot" id="teamFoot" hidden></div>
+  <div class="countdown" id="countdown" aria-live="assertive"></div>
+  <div class="popup" id="popup" aria-hidden="true"></div>
+  <div class="stage-controls"><button class="btn-danger" id="stopBtn" style="background:var(--bg)">Stop</button></div>
+</section>
+
+<!-- practice -->
+<section id="v-practice" class="stage-view practice" hidden aria-label="Practice">
+  <div class="stage" id="pStage"></div>
+  <aside class="practice-side">
+    <div class="spread"><span class="eyebrow">Practice</span><span class="muted" id="pCount"></span></div>
+    <div class="move-card" id="pMove"></div>
+    <div class="stack" style="gap:8px"><span class="muted" style="font-weight:600;font-size:14px">Speed</span><div class="tabs" id="pSpeeds"></div></div>
+    <div class="stack" id="pTries" style="gap:10px"></div>
+    <div class="row" style="margin-top:auto"><button class="grow" id="pPrev">Previous</button><button class="grow" id="pNext">Next move</button></div>
+    <button class="btn-danger" id="pExit">Exit practice</button>
+  </aside>
+  <div class="countdown" id="pCountdown"></div>
+</section>
+
+<script type="module" src="/screen.js"></script>
+</body>
+</html>
