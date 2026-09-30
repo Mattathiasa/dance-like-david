@@ -12,11 +12,13 @@ Phones need HTTPS for motion sensors. Use `cloudflared tunnel --url http://local
 ## Testing
 
 ```bash
-npm test              # ~6s: unit + integration (API, accounts, WebSocket game, scoring)
-npm run test:e2e      # ~5min: Playwright browser tests (simulated phone motion)
+npm run lint        # eslint — correctness rules; the style rules below are on you
+npm test            # ~8s: unit + integration (API, accounts, WebSocket game, scoring)
+npm run test:e2e    # ~5min: Playwright browser tests (simulated phone motion)
 ```
 
 `npm test` needs nothing extra. For `test:e2e`, once: `npx playwright install chromium`.
+All three run in CI on every push.
 
 ## Project layout
 
@@ -49,4 +51,6 @@ npm run test:e2e      # ~5min: Playwright browser tests (simulated phone motion)
 - **Admin auth** uses `x-admin-pass` header, compared with `timingSafeEqual`. The `bearer(req)` helper extracts player tokens from the `Authorization: Bearer` header.
 - **Security headers** are set in the first middleware in `server.js`. HSTS is added when `req.secure` is true.
 - **Single-instance design**: WebSocket rooms, in-memory results, and lab attempts are not shared across processes. Deploy as one instance.
-- **Scoring** happens on the phone (client-side `scoreDetail`), the server only tallies grades and recomputes points from the grade name (never trusts client-supplied `points`).
+- **Scoring** is computed on the phone for instant feedback, but the phone also sends the motion it graded (`samples`); the server re-scores that against the same chart and its verdict is the official one. Nothing is ever taken on a client's word — not the grade, not the points, not the score.
+- **Charts cross a JSON boundary**, so `validChart` in `shared/motion.js` checks the shape before the phones use one. The stored `seg.ref` is already scaled; raw samples are not.
+- **Test a new rule with a new phase** in `tests/api.test.js` (server behaviour) or `tests/scoring.test.js` (maths). They run in about eight seconds; the browser tests cost five minutes, so leave those for UI.

@@ -145,7 +145,7 @@ app.use((req, res, next) => {
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob:",
       "media-src 'self' blob:",
-      "connect-src 'self' ws: wss:",
+      "connect-src 'self'",
       "frame-ancestors 'none'",
     ].join('; '),
   });
@@ -307,7 +307,9 @@ app.delete('/api/songs/:id', admin, withSong, wrap(async (req, res) => {
 
 app.put('/api/songs/:id/audio', admin, withSong, raw('200mb'), wrap(async (req, res) => {
   if (!req.body?.length) return res.status(400).json({ error: 'Empty upload' });
-  const file = `audio.${extFor(req.get('content-type'))}`;
+  const ext = extFor(req.get('content-type'));
+  if (ext === 'bin') return res.status(400).json({ error: 'Send the audio with a content type, e.g. audio/mpeg' });
+  const file = `audio.${ext}`;
   if (req.meta.audio && req.meta.audio !== file) await fsp.rm(path.join(songDir(req.meta.id), req.meta.audio), { force: true });
   await fsp.writeFile(path.join(songDir(req.meta.id), file), req.body);
   const durationMs = Number(req.get('x-duration-ms')) || req.meta.durationMs;
@@ -357,7 +359,9 @@ app.put('/api/songs/:id/takes/:n/video', admin, withSong, raw('500mb'), wrap(asy
   const tp = path.join(songDir(req.meta.id), `take-${n}.json`);
   const take = await readJson(tp);
   if (!take) return res.status(404).json({ error: 'Take not found' });
-  const file = `take-${n}.${extFor(req.get('content-type'))}`;
+  const ext = extFor(req.get('content-type'));
+  if (ext === 'bin') return res.status(400).json({ error: 'Send the video with a content type, e.g. video/mp4' });
+  const file = `take-${n}.${ext}`;
   await fsp.writeFile(path.join(songDir(req.meta.id), file), req.body);
   take.video = file;
   await writeJson(tp, take);

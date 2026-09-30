@@ -10,6 +10,7 @@ const GRACE_MS = 120_000;
 const MAX_PLAYERS = 8;
 const MAX_GRADE_SAMPLES = 3000;
 const MAX_BAD_JOINS = 10; // per socket, before we stop guessing codes for it
+const MAX_ROOMS = 200; // a host that never disconnects would otherwise keep its room forever
 
 export function attachRooms(server, { adminPassword, accounts, results, getSong, getChart }) {
   const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024 * 1024 });
@@ -124,6 +125,7 @@ export function attachRooms(server, { adminPassword, accounts, results, getSong,
 
         case 'host': {
           if (m.kind === 'studio' && m.pass !== adminPassword) return send(ws, { t: 'error', error: 'bad admin password' });
+          if (rooms.size >= MAX_ROOMS) return send(ws, { t: 'error', error: 'The server is hosting too many rooms — try again shortly' });
           const code = newCode();
           const r = { code, kind: m.kind === 'studio' ? 'studio' : 'game', host: ws, hostSecret: secret(), players: new Map(), game: null };
           rooms.set(code, r);

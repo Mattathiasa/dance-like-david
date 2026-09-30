@@ -4,7 +4,12 @@ import fsp from 'node:fs/promises';
 const locks = new Map();
 
 export async function readJson(p, fallback = null) {
-  try { return JSON.parse(await fsp.readFile(p, 'utf8')); } catch { return fallback; }
+  try {
+    return JSON.parse(await fsp.readFile(p, 'utf8'));
+  } catch (e) {
+    if (e.code !== 'ENOENT') console.error(`[fsjson] ${p}: ${e.message}`); // a missing file is normal, a broken one is not
+    return fallback;
+  }
 }
 
 export async function writeJson(p, value) {
