@@ -155,9 +155,13 @@ test('Phase 6: Move Lab — record 3 takes, publish, good try scores high, bad t
   const shake = scoreDetail(chart, seg, samplesFor((t) => makeDancer('shake', 4)(t + 1000), -600, 4600));
   assert.ok(good.score >= 70, `good try ${good.score}`);
   assert.ok(shake.score < 40, `shaking ${shake.score}`);
-  r = await call(`/api/moves/${id}/attempts`, { method: 'POST', token: S.token, body: { score: good.score, grade: good.name } });
+  r = await call(`/api/moves/${id}/attempts`, { method: 'POST', token: S.token, body: { samples: samplesFor(move(77, 120), -600, 4600) } });
+  assert.equal(r.status, 200);
   assert.equal(r.body.personalBest, true);
-  assert.equal((await call(`/api/moves/${id}/leaderboard`)).body.rows[0].name, 'Miriam');
+  assert.equal((await call(`/api/moves/${id}/attempts`, { method: 'POST', token: S.token, body: { score: 100, grade: 'PERFECT' } })).status, 400, 'a try with no motion to score is not recorded');
+  const board = (await call(`/api/moves/${id}/leaderboard`)).body;
+  assert.equal(board.rows[0].name, 'Miriam');
+  assert.equal(board.rows[0].score, good.score, 'the server scored the motion, not the claimed score');
 });
 
 // ---------------- Phase 7 (simulated): studio takes, moves, publish ----------------

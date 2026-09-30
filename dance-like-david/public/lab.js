@@ -257,7 +257,7 @@ async function showResult(samples, mode) {
   const curve = drawCurve(intensityCurve(chart, seg, shifted));
   let save = null;
   if (mode === 'try') {
-    save = await api(`/api/moves/${m.id}/attempts`, { method: 'POST', body: { score: r.score, grade: r.name, reason: r.reason, name: store.get('ddl.name', 'Guest') } }).catch(() => null);
+    save = await api(`/api/moves/${m.id}/attempts`, { method: 'POST', body: { name: store.get('ddl.name', 'Guest'), samples } }).catch(() => null);
   }
   show('result');
   const C = 2 * Math.PI * 88;

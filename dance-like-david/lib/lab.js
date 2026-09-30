@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { buildChart, alignTakes, validSamples } from '../shared/motion.js';
+import { buildChart, alignTakes, scoreDetail, validSamples } from '../shared/motion.js';
 import { readJson, writeJson, updateJson, createJson, withLock } from './fsjson.js';
 
 const ICONS = ['left', 'right', 'up', 'down', 'spin', 'wave', 'clap', 'punch'];
@@ -162,18 +162,22 @@ export async function createLab({ dataDir, isAdmin, accounts, limit, bearer }) {
 
   r.post('/api/moves/:id/attempts', limit(40, 60000), json, withMove, wrap(async (req, res) => {
     const b = req.body || {};
-    const score = Math.round(Number(b.score));
-    if (!(score >= 0 && score <= 100)) return res.status(400).json({ error: 'Bad score' });
+    // the phone grades the try for instant feedback; the server grades the motion it was given
+    // so the leaderboard can't be topped by posting score: 100
+    if (!validSamples(b.samples, { min: 20, max: 3000 })) return res.status(400).json({ error: 'That try had no motion data to score' });
+    const chart = await readJson(path.join(dir(req.move.id), 'chart.json'));
+    if (!chart) return res.status(400).json({ error: 'This move has no recording yet' });
+    const r = scoreDetail(chart, chart.segments[0], b.samples);
     const user = accounts.userForToken(bearer(req));
     const prev = user ? bestOf(req.move.id, user.id) : 0;
     const row = {
       at: Date.now(), moveId: req.move.id, userId: user?.id || null, name: user?.displayName || String(b.name || 'Guest').slice(0, 20),
-      score, grade: ['PERFECT', 'GOOD', 'OK', 'MISS'].includes(b.grade) ? b.grade : 'MISS', reason: String(b.reason || '').slice(0, 20),
+      score: r.score, grade: r.name, reason: r.reason,
     };
     attempts.push(row);
     await withLock(attemptsFile, () => fsp.appendFile(attemptsFile, JSON.stringify(row) + '\n'));
     const board = leaderboard(req.move.id);
-    res.json({ personalBest: !!user && score > prev, best: Math.max(prev, score), rank: user ? board.find((x) => x.userId === user.id)?.rank || null : null, signedIn: !!user });
+    res.json({ personalBest: !!user && r.score > prev, best: Math.max(prev, r.score), rank: user ? board.find((x) => x.userId === user.id)?.rank || null : null, signedIn: !!user });
   }));
 
   r.get('/api/moves/:id/leaderboard', withMove, (req, res) => res.json({ rows: leaderboard(req.move.id) }));
