@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import QRCode from 'qrcode';
 import { buildChart, validSamples } from './shared/motion.js';
-import { readJson, writeJson, updateJson, httpError } from './lib/fsjson.js';
+import { readJson, writeJson, updateJson, createJson, httpError } from './lib/fsjson.js';
 import { createAccounts } from './lib/accounts.js';
 import { createResults } from './lib/results.js';
 import { attachRooms } from './lib/rooms.js';
@@ -338,11 +338,16 @@ app.get('/api/songs/:id/audio', withSong, publicOrAdmin, (req, res) => {
 app.post('/api/songs/:id/takes', admin, json, withSong, wrap(async (req, res) => {
   const { samples, durationMs, videoOffsetSec = 0, device = '' } = req.body || {};
   if (!validSamples(samples, { max: 60000 })) return res.status(400).json({ error: 'Take has too few or malformed samples' });
-  const n = ((await listTakes(req.meta.id)).at(-1) || 0) + 1;
-  await writeJson(path.join(songDir(req.meta.id), `take-${n}.json`), {
-    n, samples, durationMs, videoOffsetSec, device: String(device).slice(0, 200), video: null, createdAt: new Date().toISOString(),
-  });
-   await rebuild(req.meta.id); // keeps consistency feedback live after every take
+  const dir = songDir(req.meta.id);
+  let n = 0;
+  for (let i = 1; i <= 9999 && !n; i++) {
+    const claimed = await createJson(path.join(dir, `take-${i}.json`), {
+      n: i, samples, durationMs, videoOffsetSec, device: String(device).slice(0, 200), video: null, createdAt: new Date().toISOString(),
+    });
+    if (claimed) n = i;
+  }
+  if (!n) return res.status(400).json({ error: 'This song has too many takes already' });
+  await rebuild(req.meta.id); // keeps consistency feedback live after every take
   invalidateSongCache();
   res.json({ n });
 }));

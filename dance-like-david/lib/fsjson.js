@@ -13,6 +13,24 @@ export async function writeJson(p, value) {
   await fsp.rename(tmp, p); // atomic on the same filesystem: readers never see half a file
 }
 
+/**
+ * Write the file only if nothing is there yet — the atomic way to claim a numbered slot
+ * (take-1, take-2, …) without a read-then-write race. Returns false if someone else won it.
+ */
+export async function createJson(p, value) {
+  const tmp = `${p}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+  await fsp.writeFile(tmp, JSON.stringify(value));
+  try {
+    await fsp.link(tmp, p);
+  } catch (e) {
+    await fsp.rm(tmp, { force: true });
+    if (e.code === 'EEXIST') return false;
+    throw e;
+  }
+  await fsp.rm(tmp, { force: true });
+  return true;
+}
+
 export function withLock(key, fn) {
   const prev = locks.get(key) || Promise.resolve();
   const next = prev.then(fn, fn);

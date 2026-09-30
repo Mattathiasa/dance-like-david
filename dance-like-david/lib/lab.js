@@ -6,7 +6,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { buildChart, alignTakes, validSamples } from '../shared/motion.js';
-import { readJson, writeJson, updateJson, withLock } from './fsjson.js';
+import { readJson, writeJson, updateJson, createJson, withLock } from './fsjson.js';
 
 const ICONS = ['left', 'right', 'up', 'down', 'spin', 'wave', 'clap', 'punch'];
 const LEAD_MS = 600; // takes and attempts are recorded from -LEAD_MS to duration + LEAD_MS
@@ -125,8 +125,12 @@ export async function createLab({ dataDir, isAdmin, accounts, limit, bearer }) {
   r.post('/api/moves/:id/takes', admin, json, withMove, wrap(async (req, res) => {
     const { samples } = req.body || {};
     if (!validSamples(samples)) return res.status(400).json({ error: 'That take has no usable motion data' });
-    const n = ((await takeNums(req.move.id)).at(-1) || 0) + 1;
-    await writeJson(path.join(dir(req.move.id), `take-${n}.json`), { n, samples, createdAt: new Date().toISOString() });
+    let n = 0;
+    for (let i = 1; i <= 9999 && !n; i++) {
+      const claimed = await createJson(path.join(dir(req.move.id), `take-${i}.json`), { n: i, samples, createdAt: new Date().toISOString() });
+      if (claimed) n = i;
+    }
+    if (!n) return res.status(400).json({ error: 'This move has too many takes already' });
     await rebuild(req.move.id);
     res.json({ n, move: await summary(await getMeta(req.move.id), true) });
   }));

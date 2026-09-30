@@ -482,3 +482,15 @@ test('Phase 16: a socket can’t grind through the 4-digit code space', async ()
   await ok.wait('joined');
   tv.close(); p.close(); ok.close();
 });
+
+// ---------------- Phase 17: concurrent take uploads each get their own number ----------------
+test('Phase 17: takes uploaded at the same time don’t overwrite each other', async () => {
+  const r = await call('/api/songs', { method: 'POST', admin: true, body: { title: 'Race', bpm: 120 } });
+  const id = r.body.id;
+  const take = (seed) => ({ samples: samplesFor(makeDancer('good', seed), -500, 4000), durationMs: 3500 });
+  const ns = (await Promise.all([1, 2, 3, 4, 5, 6].map((k) => call(`/api/songs/${id}/takes`, { method: 'POST', admin: true, body: take(k * 13) })))).map((x) => x.body.n);
+  assert.equal(new Set(ns).size, 6, `every take got a distinct number (${ns.join(',')})`);
+  const full = await call(`/api/songs/${id}`, { admin: true });
+  assert.equal(full.body.takes.length, 6, 'no take was lost to the race');
+  await call(`/api/songs/${id}`, { method: 'DELETE', admin: true });
+});
