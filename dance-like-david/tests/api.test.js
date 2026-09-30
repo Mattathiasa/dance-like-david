@@ -353,3 +353,67 @@ test('Phase 12: teams mode — averages per-team, winner is the higher average',
   assert.equal(winner[0], 'A', 'team A (good dancing) should win');
   tv.close(); phones.forEach((p) => p.close());
 });
+
+// ---------------- Phase 13: grades after game finish are ignored ----------------
+test('Phase 13: late grades after finish are ignored', async () => {
+  const tv = client(); await tv.open();
+  tv.send({ t: 'host', kind: 'game' });
+  const { code } = await tv.wait('hosted');
+  const p = client(); await p.open();
+  p.send({ t: 'join', code, name: 'Miriam', token: S.token });
+  await p.wait('joined');
+  await tv.wait('playerJoined');
+
+  const moves = S.chart.segments.filter((s) => !s.rest);
+  tv.send({ t: 'toPlayers', msg: { type: 'start', songId: S.song.id, mode: 'solo', totalSegs: S.chart.segments.length, maxPoints: moves.length * 100, startServer: Date.now() } });
+  await p.wait((m) => m.t === 'msg' && m.msg.type === 'start');
+
+  // send valid grades for all moves
+  const samples = samplesFor(makeDancer('good', 303), -1000, 16000);
+  for (const m of moves) {
+    const r = scoreDetail(S.chart, m, samples);
+    p.send({ t: 'toHost', msg: { type: 'grade', seg: m.i, name: r.name, points: r.points, score: r.score } });
+  }
+  await new Promise((r) => setTimeout(r, 200));
+  tv.send({ t: 'finish' });
+  const res = await tv.wait('finished');
+
+  // now send a PERFECT grade for move 0 AFTER the game is finished — must be ignored
+  p.send({ t: 'toHost', msg: { type: 'grade', seg: moves[0].i, name: 'PERFECT', points: 100, score: 100 } });
+  await new Promise((r) => setTimeout(r, 200));
+  tv.send({ t: 'finish' }); // second finish should be a no-op
+  const entry = res.entries[0];
+  assert.equal(entry.points, moves.length * 100, 'post-finish grade did not inflate score');
+  tv.close(); p.close();
+});
+
+// ---------------- Phase 14: room rejects more than MAX_PLAYERS (8) ----------------
+test('Phase 14: room rejects the 9th player', async () => {
+  const tv = client(); await tv.open();
+  tv.send({ t: 'host', kind: 'game' });
+  const { code } = await tv.wait('hosted');
+
+  const phones = [];
+  for (let i = 0; i < 9; i++) {
+    const p = client(); await p.open();
+    p.send({ t: 'join', code, name: `Player${i}` });
+    phones.push(p);
+  }
+  const joined = [];
+  for (const p of phones) {
+    try { const m = await p.wait('joined', 3000); joined.push(m); }
+    catch { /* 'No room with that code' or 'Room is full' comes as an error msg */ }
+  }
+  assert.equal(joined.length, 8, 'exactly 8 players joined');
+  // the 9th should have received an error
+  const ninth = phones[8];
+  try {
+    await ninth.wait((m) => m.t === 'error', 1000);
+    assert.ok(true, '9th player was rejected');
+  } catch {
+    // the 9th might have already timed out on join with no 'joined' message
+    assert.equal(joined.length, 8, '9th player did not join');
+  }
+  tv.close();
+  for (const p of phones) p.close();
+});

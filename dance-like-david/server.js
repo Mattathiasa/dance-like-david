@@ -71,6 +71,22 @@ async function songSummary(meta, { full = false } = {}) {
   return out;
 }
 
+let songListCache = null;
+let songListCacheAt = 0;
+const SONG_CACHE_MS = 5000;
+function invalidateSongCache() { songListCache = null; }
+async function cachedSongList(force = false) {
+  const now = Date.now();
+  if (!force && songListCache && now - songListCacheAt < SONG_CACHE_MS) return songListCache;
+  const ids = await fsp.readdir(path.join(DATA, 'songs')).catch(() => []);
+  const out = [];
+  for (const id of ids) { const m = await getMeta(id); if (m) out.push(await songSummary(m)); }
+  out.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  songListCache = out;
+  songListCacheAt = now;
+  return out;
+}
+
 async function rebuild(id) {
   const meta = await getMeta(id);
   const takes = [];
@@ -180,10 +196,7 @@ app.get('/api/leaderboard', (req, res) => {
 
 // ----- songs -----
 app.get('/api/songs', wrap(async (req, res) => {
-  const ids = await fsp.readdir(path.join(DATA, 'songs')).catch(() => []);
-  const out = [];
-  for (const id of ids) { const m = await getMeta(id); if (m) out.push(await songSummary(m)); }
-  out.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  const out = await cachedSongList();
   res.json(isAdmin(req) ? out : out.filter((s) => s.published && s.hasChart && s.audio));
 }));
 
@@ -226,8 +239,9 @@ app.post('/api/songs', admin, json, wrap(async (req, res) => {
   const meta = cleanSongFields({ genre: 'Other', difficulty: 'Medium', familyFriendly: true, beatsPerMove: 4, firstBeatMs: 0, ...body }, {
     id, durationMs: 0, audio: null, cover: null, videoTake: null, published: false, featured: false, moves: {}, createdAt: new Date().toISOString(),
   });
-  await fsp.mkdir(songDir(id), { recursive: true });
+   await fsp.mkdir(songDir(id), { recursive: true });
   await writeJson(metaPath(id), meta);
+  invalidateSongCache();
   res.json(meta);
 }));
 
@@ -239,8 +253,9 @@ app.patch('/api/songs/:id', admin, json, withSong, wrap(async (req, res) => {
     const ids = await fsp.readdir(path.join(DATA, 'songs')).catch(() => []);
     for (const other of ids) if (other !== req.meta.id && (await getMeta(other))?.featured) await updateMeta(other, (m) => { m.featured = false; });
   }
-  const meta = await updateMeta(req.meta.id, (m) => cleanSongFields(body, m));
+   const meta = await updateMeta(req.meta.id, (m) => cleanSongFields(body, m));
   if (timingChanged) { await updateMeta(meta.id, (m) => { m.moves = {}; }); await rebuild(meta.id); }
+  invalidateSongCache();
   res.json(await songSummary(await getMeta(meta.id), { full: true }));
 }));
 
@@ -252,11 +267,13 @@ app.post('/api/songs/:id/publish', admin, json, withSong, wrap(async (req, res) 
     if (!chart?.report.scoredMoves) return res.status(400).json({ error: 'Record at least one take with dancing in it' });
   }
   await updateMeta(req.meta.id, (m) => { m.published = publish; m.publishedAt = publish ? new Date().toISOString() : null; });
+  invalidateSongCache();
   res.json(await songSummary(await getMeta(req.meta.id), { full: true }));
 }));
 
 app.delete('/api/songs/:id', admin, withSong, wrap(async (req, res) => {
   await fsp.rm(songDir(req.meta.id), { recursive: true, force: true });
+  invalidateSongCache();
   res.json({ ok: true });
 }));
 
@@ -266,6 +283,7 @@ app.put('/api/songs/:id/audio', admin, withSong, raw('200mb'), wrap(async (req, 
   if (req.meta.audio && req.meta.audio !== file) await fsp.rm(path.join(songDir(req.meta.id), req.meta.audio), { force: true });
   await fsp.writeFile(path.join(songDir(req.meta.id), file), req.body);
   const durationMs = Number(req.get('x-duration-ms')) || req.meta.durationMs;
+  invalidateSongCache();
   res.json(await updateMeta(req.meta.id, (m) => { m.audio = file; m.durationMs = durationMs; }));
 }));
 
@@ -275,6 +293,7 @@ app.put('/api/songs/:id/cover', admin, withSong, raw('8mb'), wrap(async (req, re
   const file = `cover.${extFor(ct)}`;
   if (req.meta.cover && req.meta.cover !== file) await fsp.rm(path.join(songDir(req.meta.id), req.meta.cover), { force: true });
   await fsp.writeFile(path.join(songDir(req.meta.id), file), req.body);
+  invalidateSongCache();
   res.json(await updateMeta(req.meta.id, (m) => { m.cover = file; m.coverVersion = Date.now(); }));
 }));
 
@@ -295,7 +314,8 @@ app.post('/api/songs/:id/takes', admin, json, withSong, wrap(async (req, res) =>
   await writeJson(path.join(songDir(req.meta.id), `take-${n}.json`), {
     n, samples, durationMs, videoOffsetSec, device: String(device).slice(0, 200), video: null, createdAt: new Date().toISOString(),
   });
-  await rebuild(req.meta.id); // keeps consistency feedback live after every take
+   await rebuild(req.meta.id); // keeps consistency feedback live after every take
+  invalidateSongCache();
   res.json({ n });
 }));
 
@@ -320,12 +340,14 @@ app.delete('/api/songs/:id/takes/:n', admin, withSong, wrap(async (req, res) => 
   if (take?.video) await fsp.rm(path.join(dir, take.video), { force: true });
   if (req.meta.videoTake === n) await updateMeta(req.meta.id, (m) => { m.videoTake = null; });
   await rebuild(req.meta.id);
+  invalidateSongCache();
   res.json({ ok: true });
 }));
 
 app.post('/api/songs/:id/build', admin, withSong, wrap(async (req, res) => {
   const chart = await rebuild(req.meta.id);
   if (!chart) return res.status(400).json({ error: 'No takes recorded yet' });
+  invalidateSongCache();
   res.json(await songSummary(await getMeta(req.meta.id), { full: true }));
 }));
 
