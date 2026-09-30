@@ -199,7 +199,7 @@ test('Phase 8: game — TV hosts, 2 phones dance, Wi-Fi drop + rejoin, official 
   phones[1] = back;
 
   const moves = S.chart.segments.filter((s) => !s.rest);
-  tv.send({ t: 'toPlayers', msg: { type: 'start', songId: S.song.id, mode: 'solo', totalSegs: S.chart.segments.length, maxPoints: moves.length * 100, startServer: Date.now() } });
+  tv.send({ t: 'toPlayers', msg: { type: 'start', songId: S.song.id, mode: 'solo', scoredIdx: moves.map((s) => s.i), totalSegs: S.chart.segments.length, maxPoints: moves.length * 100, startServer: Date.now() } });
   await phones[0].wait((m) => m.t === 'msg' && m.msg.type === 'start');
   const dancers = [samplesFor(makeDancer('good', 303), -1000, 16000), samplesFor(makeDancer('shake', 5), -1000, 16000)];
   phones.forEach((p, k) => {
@@ -229,7 +229,7 @@ test('Phase 8: game — TV hosts, 2 phones dance, Wi-Fi drop + rejoin, official 
   for (const c of [tv, ...phones]) c.close();
 });
 
-// ---------------- Phase 9: server rejects grades for non-existent segments ----------------
+// ---------------- Phase 9: server rejects grades it shouldn't count ----------------
 test('Phase 9: bogus segment indices are rejected — can’t inflate score', async () => {
   const tv = client(); await tv.open();
   tv.send({ t: 'host', kind: 'game' });
@@ -242,7 +242,7 @@ test('Phase 9: bogus segment indices are rejected — can’t inflate score', as
 
   const moves = S.chart.segments.filter((s) => !s.rest);
   const totalSegs = S.chart.segments.length;
-  tv.send({ t: 'toPlayers', msg: { type: 'start', songId: S.song.id, mode: 'solo', totalSegs, maxPoints: moves.length * 100, startServer: Date.now() } });
+  tv.send({ t: 'toPlayers', msg: { type: 'start', songId: S.song.id, mode: 'solo', scoredIdx: moves.map((s) => s.i), totalSegs, maxPoints: moves.length * 100, startServer: Date.now() } });
   await p.wait((m) => m.t === 'msg' && m.msg.type === 'start');
 
   const samples = samplesFor(makeDancer('good', 303), -1000, 16000);
@@ -258,12 +258,19 @@ test('Phase 9: bogus segment indices are rejected — can’t inflate score', as
   for (let i = totalSegs; i < totalSegs + 10; i++) {
     p.send({ t: 'toHost', msg: { type: 'grade', seg: i, name: 'PERFECT', points: 100, score: 100 } });
   }
+  // and grades for rest segments — in range, but the TV did not list them as scored
+  const rest = S.chart.segments.filter((s) => s.rest);
+  assert.ok(rest.length, 'the test song has a rest segment to attack');
+  for (const r of rest) {
+    p.send({ t: 'toHost', msg: { type: 'grade', seg: r.i, name: 'PERFECT', points: 100, score: 100 } });
+  }
   await new Promise((r) => setTimeout(r, 300));
   tv.send({ t: 'finish' });
   const res = await tv.wait('finished');
   const entry = res.entries[0];
   assert.equal(entry.points, moves.length * 100, 'bogus segments did not inflate the score');
   assert.equal(entry.counts.PERFECT, moves.length, 'only real segments were tallied');
+  assert.ok(entry.accuracy <= 100, `accuracy stayed in range (${entry.accuracy})`);
   tv.close(); p.close();
 });
 
@@ -296,7 +303,7 @@ test('Phase 11: practice mode — grades relayed but not tallied as a real game'
 
   const moves = S.chart.segments.filter((s) => !s.rest);
   // start a real game, send some grades, then send practiceStart (switches to practice)
-  tv.send({ t: 'toPlayers', msg: { type: 'start', songId: S.song.id, mode: 'solo', totalSegs: S.chart.segments.length, maxPoints: moves.length * 100, startServer: Date.now() } });
+  tv.send({ t: 'toPlayers', msg: { type: 'start', songId: S.song.id, mode: 'solo', scoredIdx: moves.map((s) => s.i), totalSegs: S.chart.segments.length, maxPoints: moves.length * 100, startServer: Date.now() } });
   await p.wait((m) => m.t === 'msg' && m.msg.type === 'start');
   const samples = samplesFor(makeDancer('good', 42), -1000, 16000);
   const r = scoreDetail(S.chart, moves[0], samples);
@@ -332,7 +339,7 @@ test('Phase 12: teams mode — averages per-team, winner is the higher average',
 
   const moves = S.chart.segments.filter((s) => !s.rest);
   // assign: Miriam=team A, Guest=team B
-  tv.send({ t: 'toPlayers', msg: { type: 'start', songId: S.song.id, mode: 'teams', teams: { [phones[0].seat.id]: 'A', [phones[1].seat.id]: 'B' }, totalSegs: S.chart.segments.length, maxPoints: moves.length * 100, startServer: Date.now() } });
+  tv.send({ t: 'toPlayers', msg: { type: 'start', songId: S.song.id, mode: 'teams', teams: { [phones[0].seat.id]: 'A', [phones[1].seat.id]: 'B' }, scoredIdx: moves.map((s) => s.i), totalSegs: S.chart.segments.length, maxPoints: moves.length * 100, startServer: Date.now() } });
   await phones[0].wait((m) => m.t === 'msg' && m.msg.type === 'start');
   // Miriam dances well, Guest shakes
   const dancers = [samplesFor(makeDancer('good', 303), -1000, 16000), samplesFor(makeDancer('shake', 5), -1000, 16000)];
@@ -365,7 +372,7 @@ test('Phase 13: late grades after finish are ignored', async () => {
   await tv.wait('playerJoined');
 
   const moves = S.chart.segments.filter((s) => !s.rest);
-  tv.send({ t: 'toPlayers', msg: { type: 'start', songId: S.song.id, mode: 'solo', totalSegs: S.chart.segments.length, maxPoints: moves.length * 100, startServer: Date.now() } });
+  tv.send({ t: 'toPlayers', msg: { type: 'start', songId: S.song.id, mode: 'solo', scoredIdx: moves.map((s) => s.i), totalSegs: S.chart.segments.length, maxPoints: moves.length * 100, startServer: Date.now() } });
   await p.wait((m) => m.t === 'msg' && m.msg.type === 'start');
 
   // send valid grades for all moves

@@ -291,7 +291,7 @@ async function startGame() {
   clearTimeout(S.finishTimer);
   S.gameId = (S.gameId || 0) + 1;
   const startServer = link.serverNow() + 4000;
-  toPlayers({ type: 'start', songId: S.song.id, mode: S.mode, teams, totalSegs: S.chart.segments.length, maxPoints: scoredSegs().length * 100, startServer });
+  toPlayers({ type: 'start', songId: S.song.id, mode: S.mode, teams, scoredIdx: scoredSegs().map((s) => s.i), totalSegs: S.chart.segments.length, maxPoints: scoredSegs().length * 100, startServer });
   await player.startAt(startServer);
   S.running = true;
   S.popup = null;

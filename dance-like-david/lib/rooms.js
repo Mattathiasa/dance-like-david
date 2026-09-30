@@ -34,12 +34,13 @@ export function attachRooms(server, { adminPassword, accounts, results, getSong 
 
   function tallyGrade(room, id, msg) {
     const g = room.game;
-    if (!g || g.finished || g.mode === 'practice') return;
+    if (!g || g.finished || g.mode === 'practice' || msg.practice || msg.test) return;
     const p = room.players.get(id);
     let t = g.tally.get(id);
     if (!t) g.tally.set(id, (t = { name: p?.name || 'Dancer', userId: p?.userId || null, points: 0, counts: {}, streak: 0, maxStreak: 0, segGrades: {}, scoreSum: 0 }));
     if (msg.seg in t.segGrades) return; // duplicate after a reconnect flush
-    if (g.totalSegs && (msg.seg < 0 || msg.seg >= g.totalSegs)) return; // reject grades for segments that don't exist
+    // only segments the TV marked as scored count; rest segments are in range but worth nothing
+    if (g.scored ? !g.scored.has(msg.seg) : g.totalSegs && !(msg.seg >= 0 && msg.seg < g.totalSegs)) return;
     const grade = ['PERFECT', 'GOOD', 'OK', 'MISS'].includes(msg.name) ? msg.name : 'MISS';
     const points = { PERFECT: 100, GOOD: 70, OK: 40, MISS: 0 }[grade];
     t.segGrades[msg.seg] = grade;
@@ -61,7 +62,7 @@ export function attachRooms(server, { adminPassword, accounts, results, getSong 
     }
     const entries = [...g.tally.entries()].map(([playerId, t]) => ({
       playerId, userId: t.userId, name: t.name, points: t.points, counts: t.counts, maxStreak: t.maxStreak,
-      accuracy: g.maxPoints ? Math.round((t.scoreSum || 0) / (g.maxPoints / 100)) : 0,
+      accuracy: g.maxPoints ? Math.max(0, Math.min(100, Math.round((t.scoreSum || 0) / (g.maxPoints / 100)))) : 0,
       team: g.teams?.[playerId] || null, segGrades: t.segGrades,
     }));
     const recorded = await results.record({
@@ -156,7 +157,8 @@ export function attachRooms(server, { adminPassword, accounts, results, getSong 
           const msg = m.msg || {};
           if (msg.type === 'start') {
             const teams = msg.teams || null;
-            room.game = { songId: msg.songId, mode: msg.mode || 'solo', teams, totalSegs: Number(msg.totalSegs) || 0, maxPoints: Number(msg.maxPoints) || 0, startServer: msg.startServer, tally: new Map(), finished: false };
+            const scored = Array.isArray(msg.scoredIdx) ? msg.scoredIdx.map(Number).filter(Number.isInteger) : null;
+            room.game = { songId: msg.songId, mode: msg.mode || 'solo', teams, scored: scored && new Set(scored), totalSegs: Number(msg.totalSegs) || 0, maxPoints: Number(msg.maxPoints) || 0, startServer: msg.startServer, tally: new Map(), finished: false };
           }
           if (msg.type === 'practiceStart') room.game = { songId: msg.songId, mode: 'practice', tally: new Map(), finished: false };
           for (const [id, p] of room.players) if (!m.to || m.to === id) send(p.ws, { t: 'msg', msg });
