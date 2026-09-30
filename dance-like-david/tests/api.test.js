@@ -457,3 +457,28 @@ test('Phase 15: a forged PERFECT is re-scored from the motion that came with it'
   assert.ok(entry.accuracy <= 5, `accuracy reflects the real dancing (${entry.accuracy})`);
   tv.close(); p.close();
 });
+
+// ---------------- Phase 16: code guessing is rate limited ----------------
+test('Phase 16: a socket can’t grind through the 4-digit code space', async () => {
+  const tv = client(); await tv.open();
+  tv.send({ t: 'host', kind: 'game' });
+  const { code } = await tv.wait('hosted');
+
+  const p = client(); await p.open();
+  const errors = [];
+  const guesses = Array.from({ length: 12 }, (_, i) => String(1000 + i).padStart(4, '0')).filter((g) => g !== code);
+  for (const g of guesses) {
+    p.send({ t: 'join', code: g, name: 'Guesser' });
+    errors.push(await p.wait((m) => m.t === 'error' || m.t === 'joined', 2000));
+  }
+  const last = errors[errors.length - 1];
+  assert.equal(last.t, 'error', 'guessing is cut off');
+  assert.match(last.error, /Too many wrong codes/);
+  assert.ok(errors.every((e) => e.t === 'error'), 'none of the guesses found the real code by luck');
+
+  // the real code still works from a fresh socket
+  const ok = client(); await ok.open();
+  ok.send({ t: 'join', code, name: 'Miriam', token: S.token });
+  await ok.wait('joined');
+  tv.close(); p.close(); ok.close();
+});

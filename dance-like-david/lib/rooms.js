@@ -9,6 +9,7 @@ import { extendsStreak, scoreDetail, validSamples } from '../shared/motion.js';
 const GRACE_MS = 120_000;
 const MAX_PLAYERS = 8;
 const MAX_GRADE_SAMPLES = 3000;
+const MAX_BAD_JOINS = 10; // per socket, before we stop guessing codes for it
 
 export function attachRooms(server, { adminPassword, accounts, results, getSong, getChart }) {
   const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024 * 1024 });
@@ -18,7 +19,7 @@ export function attachRooms(server, { adminPassword, accounts, results, getSong,
   const secret = () => crypto.randomBytes(12).toString('hex');
   const newCode = () => {
     let c;
-    do c = String(Math.floor(1000 + Math.random() * 9000)); while (rooms.has(c));
+    do c = String(crypto.randomInt(1000, 10000)); while (rooms.has(c));
     return c;
   };
   const playerList = (room) => [...room.players.entries()].map(([id, p]) => ({
@@ -107,6 +108,7 @@ export function attachRooms(server, { adminPassword, accounts, results, getSong,
 
   wss.on('connection', (ws, req) => {
     ws.isAlive = true;
+    ws.badJoins = 0;
     ws.on('pong', () => (ws.isAlive = true));
     ws.ctx = {};
 
@@ -142,7 +144,12 @@ export function attachRooms(server, { adminPassword, accounts, results, getSong,
 
         case 'join': {
           const r = rooms.get(String(m.code || '').trim());
-          if (!r) return send(ws, { t: 'error', error: 'No room with that code' });
+          if (!r) {
+            // a 4-digit code is guessable; make guessing it a cost rather than a scan
+            if (++ws.badJoins > MAX_BAD_JOINS) return send(ws, { t: 'error', error: 'Too many wrong codes — start a new join' });
+            return send(ws, { t: 'error', error: 'No room with that code' });
+          }
+          ws.badJoins = 0;
           if (r.kind === 'studio' && [...r.players.values()].some((p) => p.ws)) return send(ws, { t: 'error', error: 'Studio already has a recorder phone' });
           if (r.players.size >= MAX_PLAYERS) return send(ws, { t: 'error', error: 'Room is full (8 dancers)' });
           const user = accounts.userForToken(m.token);
