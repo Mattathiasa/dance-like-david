@@ -16,8 +16,20 @@ export async function createLab({ dataDir, isAdmin, accounts, limit, bearer }) {
   await fsp.mkdir(root, { recursive: true });
   const attemptsFile = path.join(dataDir, 'lab.jsonl');
   const attempts = [];
+  // moveId -> { plays, best, byUser: Map<userId, { userId, name, score, at }> }
+  const byMove = new Map();
+  const addAttempt = (a) => {
+    attempts.push(a);
+    let m = byMove.get(a.moveId);
+    if (!m) byMove.set(a.moveId, (m = { plays: 0, best: 0, byUser: new Map() }));
+    m.plays++;
+    if (a.score > m.best) m.best = a.score;
+    if (!a.userId) return;
+    const cur = m.byUser.get(a.userId);
+    if (!cur || a.score > cur.score) m.byUser.set(a.userId, { userId: a.userId, name: a.name, score: a.score, at: a.at });
+  };
   if (fs.existsSync(attemptsFile)) {
-    for (const l of (await fsp.readFile(attemptsFile, 'utf8')).split('\n')) { if (l.trim()) try { attempts.push(JSON.parse(l)); } catch { /* torn line */ } }
+    for (const l of (await fsp.readFile(attemptsFile, 'utf8')).split('\n')) { if (l.trim()) try { addAttempt(JSON.parse(l)); } catch { /* torn line */ } }
   }
 
   const dir = (id) => path.join(root, id);
@@ -26,26 +38,19 @@ export async function createLab({ dataDir, isAdmin, accounts, limit, bearer }) {
   const takeNums = async (id) => (await fsp.readdir(dir(id)).catch(() => []))
     .map((f) => f.match(/^take-(\d+)\.json$/)).filter(Boolean).map((m) => Number(m[1])).sort((a, b) => a - b);
 
-  const bestOf = (moveId, userId) => attempts.filter((a) => a.moveId === moveId && a.userId === userId).reduce((m, a) => Math.max(m, a.score), 0);
-  const leaderboard = (moveId) => {
-    const best = new Map();
-    for (const a of attempts) {
-      if (a.moveId !== moveId || !a.userId) continue;
-      const cur = best.get(a.userId);
-      if (!cur || a.score > cur.score) best.set(a.userId, { userId: a.userId, name: a.name, score: a.score, at: a.at });
-    }
-    return [...best.values()].sort((a, b) => b.score - a.score || a.at - b.at).slice(0, 20).map((r, i) => ({ rank: i + 1, ...r }));
-  };
+  const bestOf = (moveId, userId) => byMove.get(moveId)?.byUser.get(userId)?.score || 0;
+  const leaderboard = (moveId) => [...(byMove.get(moveId)?.byUser.values() || [])]
+    .sort((a, b) => b.score - a.score || a.at - b.at).slice(0, 20).map((r, i) => ({ rank: i + 1, ...r }));
 
   async function summary(meta, full = false) {
     const chart = await readJson(path.join(dir(meta.id), 'chart.json'));
-    const mine = attempts.filter((a) => a.moveId === meta.id);
+    const m = byMove.get(meta.id);
     const out = {
       ...meta,
       takes: (await takeNums(meta.id)).length,
       ready: !!chart && !chart.segments[0]?.rest,
-      best: mine.reduce((m, a) => Math.max(m, a.score), 0),
-      tries: mine.length,
+      best: m?.best || 0,
+      tries: m?.plays || 0,
     };
     if (full && chart) out.report = { ...chart.report, tol: chart.segments[0]?.tol, rest: chart.segments[0]?.rest, energy: chart.segments[0]?.energy, shifts: chart.shifts };
     return out;
@@ -174,7 +179,7 @@ export async function createLab({ dataDir, isAdmin, accounts, limit, bearer }) {
       at: Date.now(), moveId: req.move.id, userId: user?.id || null, name: user?.displayName || String(b.name || 'Guest').slice(0, 20),
       score: r.score, grade: r.name, reason: r.reason,
     };
-    attempts.push(row);
+    addAttempt(row);
     await withLock(attemptsFile, () => fsp.appendFile(attemptsFile, JSON.stringify(row) + '\n'));
     const board = leaderboard(req.move.id);
     res.json({ personalBest: !!user && r.score > prev, best: Math.max(prev, r.score), rank: user ? board.find((x) => x.userId === user.id)?.rank || null : null, signedIn: !!user });

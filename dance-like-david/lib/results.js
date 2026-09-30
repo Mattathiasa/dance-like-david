@@ -9,18 +9,39 @@ import { starsFor } from '../shared/motion.js';
 export async function createResults(dataDir) {
   const file = path.join(dataDir, 'results.jsonl');
   const statsFile = path.join(dataDir, 'songstats.json');
+  // rows are kept in `at` order, and indexed so a song's best doesn't need a pass over everything
   const rows = [];
+  const bySong = new Map(); // songId -> { rows, best }
+  const byUser = new Map(); // userId -> rows
+  const add = (r) => {
+    rows.push(r);
+    let s = bySong.get(r.songId);
+    if (!s) bySong.set(r.songId, (s = { rows: [], best: 0 }));
+    s.rows.push(r);
+    if (r.points > s.best) s.best = r.points;
+    if (r.userId) {
+      const mine = byUser.get(r.userId);
+      if (mine) mine.push(r); else byUser.set(r.userId, [r]);
+    }
+  };
   if (fs.existsSync(file)) {
     for (const line of (await fsp.readFile(file, 'utf8')).split('\n')) {
       if (!line.trim()) continue;
-      try { rows.push(JSON.parse(line)); } catch { /* skip a torn line */ }
+      try { add(JSON.parse(line)); } catch { /* skip a torn line */ }
     }
   }
   const stats = await readJson(statsFile, {}); // songId -> { plays, seg: { i: [misses, total] } }
 
-  const bestFor = (songId, userId, before = Infinity) =>
-    rows.filter((r) => r.songId === songId && r.userId === userId && r.at < before).reduce((m, r) => Math.max(m, r.points), 0);
-  const songBest = (songId) => rows.filter((r) => r.songId === songId).reduce((m, r) => Math.max(m, r.points), 0);
+  // rows for one song are in `at` order, so everything before a timestamp is a prefix
+  const bestFor = (songId, userId, before = Infinity) => {
+    const list = bySong.get(songId)?.rows;
+    let m = 0;
+    for (let i = (list?.length || 0) - 1; i >= 0 && list[i].at < before; i--) {
+      if (list[i].userId === userId && list[i].points > m) m = list[i].points;
+    }
+    return m;
+  };
+  const songBest = (songId) => bySong.get(songId)?.best || 0;
 
   return {
     songBest,
@@ -45,12 +66,12 @@ export async function createResults(dataDir) {
           roomRecord: e.points > 0 && e.points > prevRoomBest && i === 0,
         };
       });
-      const lines = out.map((e) => JSON.stringify({
+      const logged = out.map((e) => ({
         at, songId, songTitle, mode, room, userId: e.userId || null, name: e.name, points: e.points,
         maxPoints, counts: e.counts, maxStreak: e.maxStreak, rank: e.rank, of: e.of, stars: e.stars, accuracy: e.accuracy ?? null,
       }));
-      for (const l of lines) rows.push(JSON.parse(l));
-      await withLock(file, () => fsp.appendFile(file, lines.join('\n') + '\n'));
+      for (const r of logged) add(r);
+      await withLock(file, () => fsp.appendFile(file, logged.map((r) => JSON.stringify(r)).join('\n') + '\n'));
 
       // per-move miss rates for the studio
       const st = (stats[songId] ||= { plays: 0, seg: {} });
@@ -70,9 +91,8 @@ export async function createResults(dataDir) {
     leaderboard({ songId, period = 'all', limit = 50 }) {
       const since = period === 'week' ? Date.now() - 7 * 864e5 : 0;
       const best = new Map(); // key -> { userId, name, points }
-      for (const r of rows) {
+      for (const r of songId ? bySong.get(songId)?.rows || [] : rows) {
         if (!r.userId || r.at < since) continue;
-        if (songId && r.songId !== songId) continue;
         const key = songId ? r.userId : `${r.userId}|${r.songId}`;
         const cur = best.get(key);
         if (!cur || r.points > cur.points) best.set(key, { userId: r.userId, name: r.name, points: r.points });
@@ -91,7 +111,7 @@ export async function createResults(dataDir) {
     },
 
     userStats(userId) {
-      const mine = rows.filter((r) => r.userId === userId);
+      const mine = byUser.get(userId) || [];
       return {
         songsDanced: new Set(mine.map((r) => r.songId)).size,
         games: mine.length,

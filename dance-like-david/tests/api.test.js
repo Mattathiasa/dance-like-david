@@ -498,3 +498,19 @@ test('Phase 17: takes uploaded at the same time don’t overwrite each other', a
   assert.equal(full.body.takes.length, 6, 'no take was lost to the race');
   await call(`/api/songs/${id}`, { method: 'DELETE', admin: true });
 });
+
+// ---------------- Phase 18: the in-memory indexes are rebuilt from disk ----------------
+test('Phase 18: leaderboards and profiles survive a restart', async () => {
+  const before = await call('/api/leaderboard?song=' + S.song.id);
+  const me = (await call('/api/me', { token: S.token })).body.stats;
+  await stopServer();
+  await startServer();
+  const after = await call('/api/leaderboard?song=' + S.song.id);
+  assert.deepEqual(after.body.rows, before.body.rows, 'the song leaderboard is rebuilt from results.jsonl');
+  const me2 = (await call('/api/me', { token: S.token })).body.stats;
+  assert.equal(me2.games, me.games);
+  assert.equal(me2.songsDanced, me.songsDanced);
+  assert.equal(me2.bestStreak, me.bestStreak);
+  const all = (await call('/api/leaderboard?period=all')).body.rows;
+  assert.ok(all.length && all[0].points >= all[all.length - 1].points, 'all-time totals still add up');
+});
