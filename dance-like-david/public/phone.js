@@ -313,12 +313,15 @@ function startDance({ startServer, songId, test = false }) {
     $('#dProg').style.width = `${Math.max(0, Math.min(100, (now / lastEnd) * 100))}%`;
     while (S.next < segs.length && now > segs[S.next].end + 250) {
       const seg = segs[S.next++];
-      const r = gradeSegment(P.chart, seg, buf.filter((x) => x[0] >= seg.start - 800 && x[0] <= seg.end + 800));
+      const window = buf.filter((x) => x[0] >= seg.start - 800 && x[0] <= seg.end + 800);
+      const r = gradeSegment(P.chart, seg, window);
       S.score += r.points;
       S.counts[r.name] = (S.counts[r.name] || 0) + 1;
       S.streak = extendsStreak(r.name) ? S.streak + 1 : 0;
       S.accSum += r.score;
-      toHost({ type: 'grade', seg: seg.i, name: r.name, points: r.points, score: r.score, tip: r.tip, reason: r.reason, lagMs: r.lagMs, size: r.size, dist: r.dist, ratio: r.ratio, test });
+      // the window travels with the grade: the server re-scores it, so a phone can't claim a
+      // grade it didn't earn. It rides along in the outbox too, so offline moves stay verifiable.
+      toHost({ type: 'grade', seg: seg.i, name: r.name, points: r.points, score: r.score, tip: r.tip, reason: r.reason, lagMs: r.lagMs, size: r.size, dist: r.dist, ratio: r.ratio, test, samples: window });
       $('#dTip').textContent = r.tip;
       $('#dAcc').textContent = `${Math.round(S.accSum / S.next)}%`;
       g.textContent = r.name;

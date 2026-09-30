@@ -71,6 +71,12 @@ function client() {
 before(startServer);
 after(async () => { await stopServer(); fs.rmSync(DATA, { recursive: true, force: true }); });
 
+/** What a phone actually sends: its verdict plus the motion window it graded. */
+const gradeFor = (chart, seg, samples, extra = {}) => {
+  const win = samples.filter((x) => x[0] >= seg.start - 800 && x[0] <= seg.end + 800);
+  return { type: 'grade', seg: seg.i, ...scoreDetail(chart, seg, win), samples: win, ...extra };
+};
+
 // ---------------- Phase 1–2: server and pages ----------------
 test('Phase 1: server is healthy', async () => {
   const r = await call('/api/health');
@@ -205,8 +211,8 @@ test('Phase 8: game — TV hosts, 2 phones dance, Wi-Fi drop + rejoin, official 
   phones.forEach((p, k) => {
     for (const m of moves) {
       const r = scoreDetail(S.chart, m, dancers[k]);
-      p.send({ t: 'toHost', msg: { type: 'grade', seg: m.i, name: r.name, points: r.points, score: r.score } });
-      p.send({ t: 'toHost', msg: { type: 'grade', seg: m.i, name: 'PERFECT', points: 100, score: 100 } }); // duplicate must be ignored
+      p.send({ t: 'toHost', msg: gradeFor(S.chart, m, dancers[k]) });
+      p.send({ t: 'toHost', msg: { ...gradeFor(S.chart, m, dancers[k]), name: 'PERFECT', points: 100 } }); // duplicate must be ignored
     }
   });
   await new Promise((r) => setTimeout(r, 300));
@@ -248,8 +254,7 @@ test('Phase 9: bogus segment indices are rejected — can’t inflate score', as
   const samples = samplesFor(makeDancer('good', 303), -1000, 16000);
   // send valid grades for real segments
   for (const m of moves) {
-    const r = scoreDetail(S.chart, m, samples);
-    p.send({ t: 'toHost', msg: { type: 'grade', seg: m.i, name: r.name, points: r.points, score: r.score } });
+    p.send({ t: 'toHost', msg: gradeFor(S.chart, m, samples) });
   }
   // send bogus grades for segments that don't exist — server must reject these
   p.send({ t: 'toHost', msg: { type: 'grade', seg: 999, name: 'PERFECT', points: 100, score: 100 } });
@@ -306,8 +311,7 @@ test('Phase 11: practice mode — grades relayed but not tallied as a real game'
   tv.send({ t: 'toPlayers', msg: { type: 'start', songId: S.song.id, mode: 'solo', scoredIdx: moves.map((s) => s.i), totalSegs: S.chart.segments.length, maxPoints: moves.length * 100, startServer: Date.now() } });
   await p.wait((m) => m.t === 'msg' && m.msg.type === 'start');
   const samples = samplesFor(makeDancer('good', 42), -1000, 16000);
-  const r = scoreDetail(S.chart, moves[0], samples);
-  p.send({ t: 'toHost', msg: { type: 'grade', seg: moves[0].i, name: r.name, points: r.points, score: r.score } });
+  p.send({ t: 'toHost', msg: gradeFor(S.chart, moves[0], samples) });
   await new Promise((r) => setTimeout(r, 200));
   // send practiceStart — server creates a practice game, which should not tally the grade
   tv.send({ t: 'toPlayers', msg: { type: 'practiceStart', songId: S.song.id } });
@@ -346,7 +350,7 @@ test('Phase 12: teams mode — averages per-team, winner is the higher average',
   phones.forEach((p, k) => {
     for (const m of moves) {
       const r = scoreDetail(S.chart, m, dancers[k]);
-      p.send({ t: 'toHost', msg: { type: 'grade', seg: m.i, name: r.name, points: r.points, score: r.score } });
+      p.send({ t: 'toHost', msg: gradeFor(S.chart, m, dancers[k]) });
     }
   });
   await new Promise((r) => setTimeout(r, 300));
@@ -378,8 +382,7 @@ test('Phase 13: late grades after finish are ignored', async () => {
   // send valid grades for all moves
   const samples = samplesFor(makeDancer('good', 303), -1000, 16000);
   for (const m of moves) {
-    const r = scoreDetail(S.chart, m, samples);
-    p.send({ t: 'toHost', msg: { type: 'grade', seg: m.i, name: r.name, points: r.points, score: r.score } });
+    p.send({ t: 'toHost', msg: gradeFor(S.chart, m, samples) });
   }
   await new Promise((r) => setTimeout(r, 200));
   tv.send({ t: 'finish' });
@@ -423,4 +426,34 @@ test('Phase 14: room rejects the 9th player', async () => {
   }
   tv.close();
   for (const p of phones) p.close();
+});
+
+// ---------------- Phase 15: the server scores, not the phone ----------------
+test('Phase 15: a forged PERFECT is re-scored from the motion that came with it', async () => {
+  const tv = client(); await tv.open();
+  tv.send({ t: 'host', kind: 'game' });
+  const { code } = await tv.wait('hosted');
+  const p = client(); await p.open();
+  p.send({ t: 'join', code, name: 'Miriam', token: S.token });
+  await p.wait('joined');
+  await tv.wait('playerJoined');
+
+  const moves = S.chart.segments.filter((s) => !s.rest);
+  tv.send({ t: 'toPlayers', msg: { type: 'start', songId: S.song.id, mode: 'solo', scoredIdx: moves.map((s) => s.i), totalSegs: S.chart.segments.length, maxPoints: moves.length * 100, startServer: Date.now() } });
+  await p.wait((m) => m.t === 'msg' && m.msg.type === 'start');
+
+  const still = samplesFor(makeDancer('still', 9), -1000, 16000);
+  for (const m of moves) {
+    // claims a perfect run, but attaches the motion of someone standing still
+    p.send({ t: 'toHost', msg: { ...gradeFor(S.chart, m, still), name: 'PERFECT', points: 100, score: 100 } });
+  }
+  // and one move with no motion attached at all
+  p.send({ t: 'toHost', msg: { type: 'grade', seg: moves[0].i, name: 'PERFECT', points: 100, score: 100 } });
+  await new Promise((r) => setTimeout(r, 400));
+  tv.send({ t: 'finish' });
+  const entry = (await tv.wait('finished')).entries[0];
+  assert.equal(entry.points, 0, 'the server ignored the claimed grades and graded the motion');
+  assert.ok(entry.counts.MISS >= moves.length, `every move missed (${JSON.stringify(entry.counts)})`);
+  assert.ok(entry.accuracy <= 5, `accuracy reflects the real dancing (${entry.accuracy})`);
+  tv.close(); p.close();
 });

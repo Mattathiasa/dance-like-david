@@ -4,12 +4,13 @@
 // and holds a seat for 2 minutes when a phone or the TV drops off Wi-Fi.
 import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
-import { extendsStreak } from '../shared/motion.js';
+import { extendsStreak, scoreDetail, validSamples } from '../shared/motion.js';
 
 const GRACE_MS = 120_000;
 const MAX_PLAYERS = 8;
+const MAX_GRADE_SAMPLES = 3000;
 
-export function attachRooms(server, { adminPassword, accounts, results, getSong }) {
+export function attachRooms(server, { adminPassword, accounts, results, getSong, getChart }) {
   const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024 * 1024 });
   const rooms = new Map(); // code -> room
   const now = () => performance.timeOrigin + performance.now();
@@ -32,23 +33,37 @@ export function attachRooms(server, { adminPassword, accounts, results, getSong 
     rooms.delete(code);
   }
 
-  function tallyGrade(room, id, msg) {
+  /**
+   * The phone sends the motion it captured for the move; the server grades it against the same
+   * chart the phone used, so a client can't claim PERFECT without a dance behind it. Returns the
+   * verified grade for the TV to show, or null when the grade isn't part of the official tally.
+   */
+  async function tallyGrade(room, id, msg) {
     const g = room.game;
-    if (!g || g.finished || g.mode === 'practice' || msg.practice || msg.test) return;
+    if (!g || g.finished || g.mode === 'practice' || msg.practice || msg.test) return null;
     const p = room.players.get(id);
     let t = g.tally.get(id);
-    if (!t) g.tally.set(id, (t = { name: p?.name || 'Dancer', userId: p?.userId || null, points: 0, counts: {}, streak: 0, maxStreak: 0, segGrades: {}, scoreSum: 0 }));
-    if (msg.seg in t.segGrades) return; // duplicate after a reconnect flush
-    // only segments the TV marked as scored count; rest segments are in range but worth nothing
-    if (g.scored ? !g.scored.has(msg.seg) : g.totalSegs && !(msg.seg >= 0 && msg.seg < g.totalSegs)) return;
-    const grade = ['PERFECT', 'GOOD', 'OK', 'MISS'].includes(msg.name) ? msg.name : 'MISS';
-    const points = { PERFECT: 100, GOOD: 70, OK: 40, MISS: 0 }[grade];
-    t.segGrades[msg.seg] = grade;
-    t.points += points;
-    t.scoreSum += Math.max(0, Math.min(100, Number(msg.score) || 0));
-    t.counts[grade] = (t.counts[grade] || 0) + 1;
-    t.streak = extendsStreak(grade) ? t.streak + 1 : 0;
-    t.maxStreak = Math.max(t.maxStreak, t.streak);
+    if (!t) g.tally.set(id, (t = { name: p?.name || 'Dancer', userId: p?.userId || null, points: 0, counts: {}, streak: 0, maxStreak: 0, segGrades: {}, scoreSum: 0, pending: new Set() }));
+    if (msg.seg in t.segGrades || t.pending.has(msg.seg)) return null; // duplicate, or a rejoin flush racing its own original
+    if (g.scored ? !g.scored.has(msg.seg) : g.totalSegs && !(msg.seg >= 0 && msg.seg < g.totalSegs)) return null;
+    t.pending.add(msg.seg);
+    try {
+      const chart = await getChart(g.songId);
+      const seg = chart?.segments.find((s) => s.i === msg.seg);
+      if (!seg) return null;
+      const r = validSamples(msg.samples, { min: 5, max: MAX_GRADE_SAMPLES })
+        ? scoreDetail(chart, seg, msg.samples)
+        : { name: 'MISS', points: 0, score: 0, reason: 'no-data', tip: 'No motion reached the game' };
+      t.segGrades[msg.seg] = r.name;
+      t.points += r.points;
+      t.scoreSum += Math.max(0, Math.min(100, r.score));
+      t.counts[r.name] = (t.counts[r.name] || 0) + 1;
+      t.streak = extendsStreak(r.name) ? t.streak + 1 : 0;
+      t.maxStreak = Math.max(t.maxStreak, t.streak);
+      return { ...msg, ...r, samples: undefined };
+    } finally {
+      t.pending.delete(msg.seg);
+    }
   }
 
   async function finishGame(room) {
@@ -170,7 +185,10 @@ export function attachRooms(server, { adminPassword, accounts, results, getSong 
           const msg = m.msg || {};
           const p = room.players.get(ctx.id);
           if (msg.type === 'ready' && p) p.ready = true;
-          if (msg.type === 'grade') tallyGrade(room, ctx.id, msg);
+          if (msg.type === 'grade') {
+            const verified = await tallyGrade(room, ctx.id, msg);
+            if (verified) return send(room.host, { t: 'msg', from: ctx.id, name: p?.name, msg: verified });
+          }
           return send(room.host, { t: 'msg', from: ctx.id, name: p?.name, msg });
         }
 

@@ -74,7 +74,8 @@ async function songSummary(meta, { full = false } = {}) {
 let songListCache = null;
 let songListCacheAt = 0;
 const SONG_CACHE_MS = 5000;
-function invalidateSongCache() { songListCache = null; }
+const chartCache = new Map();
+function invalidateSongCache() { songListCache = null; chartCache.clear(); }
 async function cachedSongList(force = false) {
   const now = Date.now();
   if (!force && songListCache && now - songListCacheAt < SONG_CACHE_MS) return songListCache;
@@ -84,6 +85,33 @@ async function cachedSongList(force = false) {
   out.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   songListCache = out;
   songListCacheAt = now;
+  return out;
+}
+
+/**
+ * The chart phones score against, with the admin's move names, pictograms and strictness merged in.
+ * Cached and shared with the room tally, which scores grades itself — so both sides grade
+ * against exactly the same reference. scoreDetail memoises _refArr on the segment, so the
+ * HTTP route must strip it before serialising.
+ */
+async function loadChart(id) {
+  if (chartCache.has(id)) return chartCache.get(id);
+  const chart = await readJson(path.join(songDir(id), 'chart.json'));
+  if (!chart) return null;
+  const meta = await getMeta(id);
+  const moves = meta?.moves || {};
+  const out = {
+    ...chart,
+    segments: chart.segments.map((s) => ({
+      ...s,
+      name: moves[s.i]?.name || (s.rest ? 'Rest' : `Move ${s.i + 1}`),
+      icon: moves[s.i]?.icon || null,
+      strict: moves[s.i]?.strict || 1,
+    })),
+    bpm: meta?.bpm,
+    beatsPerMove: meta?.beatsPerMove,
+  };
+  chartCache.set(id, out);
   return out;
 }
 
@@ -353,18 +381,9 @@ app.post('/api/songs/:id/build', admin, withSong, wrap(async (req, res) => {
 
 /** The chart phones score against, with the admin's move names, pictograms and strictness merged in. */
 app.get('/api/songs/:id/chart', withSong, publicOrAdmin, wrap(async (req, res) => {
-  const chart = await readJson(path.join(songDir(req.meta.id), 'chart.json'));
+  const chart = await loadChart(req.meta.id);
   if (!chart) return res.status(404).json({ error: 'No moves yet — record takes in the Studio' });
-  const moves = req.meta.moves || {};
-  chart.segments = chart.segments.map((s) => ({
-    ...s,
-    name: moves[s.i]?.name || (s.rest ? 'Rest' : `Move ${s.i + 1}`),
-    icon: moves[s.i]?.icon || null,
-    strict: moves[s.i]?.strict || 1,
-  }));
-  chart.bpm = req.meta.bpm;
-  chart.beatsPerMove = req.meta.beatsPerMove;
-  res.json(chart);
+  res.json({ ...chart, segments: chart.segments.map(({ _refArr, ...s }) => s) });
 }));
 
 app.get('/api/songs/:id/video', withSong, publicOrAdmin, wrap(async (req, res) => {
@@ -393,7 +412,7 @@ const server = hasCerts
   ? https.createServer({ key: fs.readFileSync(path.join(certDir, 'key.pem')), cert: fs.readFileSync(path.join(certDir, 'cert.pem')) }, app)
   : http.createServer(app);
 
-attachRooms(server, { adminPassword: ADMIN_PASSWORD, accounts, results, getSong: getMeta });
+attachRooms(server, { adminPassword: ADMIN_PASSWORD, accounts, results, getSong: getMeta, getChart: loadChart });
 
 server.listen(PORT, () => {
   console.log(`Dance Like David on ${hasCerts ? 'https' : 'http'}://localhost:${PORT}`);
