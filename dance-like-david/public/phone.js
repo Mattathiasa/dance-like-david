@@ -2,7 +2,7 @@
 import { $, $$, el, api, auth, Link, store, sleep, fmtTime, fmtNum, ordinal, avatar, coverEl, toast } from './common.js';
 import { icon, defaultMoveIcon } from './icons.js';
 import { MotionCapture, keepAwake } from './motion-capture.js';
-import { gradeSegment, extendsStreak } from '/shared/motion.js';
+import { gradeSegment, extendsStreak, validChart } from '/shared/motion.js';
 
 const link = new Link();
 const motion = new MotionCapture();
@@ -256,13 +256,13 @@ link.onMsg(async (m) => {
     case 'load':
       P.song = { id: msg.songId, title: msg.title, artist: msg.artist, genre: msg.genre };
       P.chart = null;
-      try { P.chart = await api(`/api/songs/${msg.songId}/chart`, { token: null }); } catch { /* reported below */ }
+      try { const c = await api(`/api/songs/${msg.songId}/chart`, { token: null }); if (validChart(c)) P.chart = c; } catch { /* reported below */ }
       toHost({ type: 'loaded', ok: !!P.chart });
       if (['wait', 'results', 'practice'].includes(P.view) || P.view === 'grip') { if (P.view !== 'grip') showWait(); }
       break;
     case 'unload': P.song = null; P.chart = null; if (P.view === 'wait' || P.view === 'results') showWait(); break;
     case 'start': startDance(msg); break;
-    case 'testRun': P.chart = msg.chart; P.song = { id: msg.chart.songId, title: `Test run · ${msg.title || ''}` }; startDance({ startServer: msg.startServer, songId: msg.chart.songId, test: true }); break;
+    case 'testRun': P.chart = validChart(msg.chart) ? msg.chart : null; P.song = { id: msg.chart.songId, title: `Test run · ${msg.title || ''}` }; startDance({ startServer: msg.startServer, songId: msg.chart.songId, test: true }); break;
     case 'standings': P.place = msg.ranks?.[P.id] || null; P.of = msg.of; renderPlace(); break;
     case 'stop': stopSession(); showWait('The screen stopped the song.'); break;
     case 'final': stopSession(); showResults(msg); break;

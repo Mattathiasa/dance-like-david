@@ -2,7 +2,7 @@
 import { $, $$, el, api, auth, store, sleep, fmtNum, avatar, toast } from './common.js';
 import { icon, MOVE_ICONS, MOVE_ICON_LABELS } from './icons.js';
 import { MotionCapture, keepAwake } from './motion-capture.js';
-import { scoreDetail, intensityCurve, TIERS } from '/shared/motion.js';
+import { scoreDetail, intensityCurve, TIERS, validChart } from '/shared/motion.js';
 
 const LEAD_MS = 600;
 const motion = new MotionCapture();
@@ -79,7 +79,8 @@ function unlock() {
 async function openMove(id) {
   try {
     L.move = isAdmin() ? await adm(`/api/moves/${id}`) : await api(`/api/moves/${id}`, { token: null });
-    L.chart = L.move.takes ? await (isAdmin() ? adm : (p) => api(p, { token: null }))(`/api/moves/${id}/chart`) : null;
+    const c = L.move.takes ? await (isAdmin() ? adm : (p) => api(p, { token: null }))(`/api/moves/${id}/chart`) : null;
+    L.chart = validChart(c) ? c : null;
   } catch (e) { toast(e.message); return; }
   const m = L.move;
   show('move');
@@ -249,7 +250,7 @@ async function perform(mode) {
 // ---------------- results ----------------
 async function showResult(samples, mode) {
   const m = L.move;
-  if (mode === 'test') L.chart = await adm(`/api/moves/${m.id}/chart`);
+  if (mode === 'test') { const c = await adm(`/api/moves/${m.id}/chart`); L.chart = validChart(c) ? c : null; }
   const chart = L.chart;
   const seg = chart.segments[0];
   const r = scoreDetail(chart, seg, samples);

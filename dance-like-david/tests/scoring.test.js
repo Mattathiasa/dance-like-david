@@ -1,7 +1,7 @@
 // Phase 6 (simulated): does the scoring engine tell good dancing from bad?
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildChart, scoreDetail, alignTakes, accuracyFromRatio } from '../shared/motion.js';
+import { buildChart, scoreDetail, alignTakes, accuracyFromRatio, validChart } from '../shared/motion.js';
 import { makeDancer, samplesFor } from './sim.js';
 
 const meta = { id: 'x', bpm: 120, beatsPerMove: 4, firstBeatMs: 0, durationMs: 16000 };
@@ -35,4 +35,33 @@ test('Move Lab takes started at different times get aligned', () => {
   const labChart = buildChart({ id: 'lab', segments: [{ i: 0, start: 0, end: 4000 }] }, a);
   const r = scoreDetail(labChart, labChart.segments[0], samplesFor(move(99, 150), -800, 4800));
   assert.ok(r.score >= 70, `score ${r.score}`);
+});
+
+// A refactor of the maths must not quietly change what dancers are told. Names and reasons are
+// pinned exactly; scores are pinned to ±3 because Math.sin differs in the last bits between
+// platforms and a tier edge shouldn't flip on that.
+const GOLDEN = [
+  { kind: 'good', opts: {}, names: ['PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT'], scores: [96, 97, 98, 96, 96, 94], reason: 'perfect' },
+  { kind: 'good', opts: { lateMs: 300 }, names: ['PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT'], scores: [96, 96, 97, 95, 92, 92], reason: 'perfect' },
+  { kind: 'good', opts: { scale: 0.3 }, names: ['MISS', 'MISS', 'MISS', 'MISS', 'MISS', 'MISS'], scores: [17, 15, 16, 14, 13, 16], reason: 'small' },
+  { kind: 'mirror', opts: {}, names: ['MISS', 'MISS', 'MISS', 'MISS', 'MISS', 'MISS'], scores: [0, 13, 0, 0, 16, 0], reason: 'mirrored' },
+  { kind: 'shake', opts: {}, names: ['MISS', 'MISS', 'MISS', 'MISS', 'MISS', 'MISS'], scores: [0, 0, 0, 0, 0, 0], reason: 'shaky' },
+  { kind: 'still', opts: {}, names: ['MISS', 'MISS', 'MISS', 'MISS', 'MISS', 'MISS'], scores: [0, 0, 0, 0, 0, 0], reason: 'still' },
+  { kind: 'lazy', opts: {}, names: ['MISS', 'MISS', 'MISS', 'MISS', 'MISS', 'MISS'], scores: [0, 0, 0, 0, 0, 0], reason: 'small' },
+];
+test('golden: the same dancers get the same verdicts', () => {
+  for (const c of GOLDEN) {
+    const r = play(c.kind, c.opts);
+    assert.deepEqual(r.map((x) => x.name), c.names, `${c.kind} ${JSON.stringify(c.opts)} grades`);
+    assert.ok(r.every((x) => x.reason === c.reason), `${c.kind}: ${r.map((x) => x.reason).join()}`);
+    r.forEach((x, i) => assert.ok(Math.abs(x.score - c.scores[i]) <= 3, `${c.kind} move ${i}: ${x.score} vs ${c.scores[i]}`));
+  }
+});
+test('a chart the phones can trust passes validChart, a broken one does not', () => {
+  assert.ok(validChart(chart));
+  assert.ok(!validChart(null));
+  assert.ok(!validChart({ ...chart, accScale: 0 }));
+  const bad = { ...chart, segments: [{ ...chart.segments[0], ref: [1, 2, NaN] }] };
+  assert.ok(!validChart(bad));
+  assert.ok(!validChart({ ...chart, segments: [{ ...chart.segments[0], tol: 0 }] }));
 });

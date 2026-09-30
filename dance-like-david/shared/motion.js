@@ -374,6 +374,21 @@ export function validSamples(s, { min = 20, max = 60000 } = {}) {
     && s.every((r) => Array.isArray(r) && r.length === DIMS + 1 && r.every((v) => Number.isFinite(v)));
 }
 
+/**
+ * A chart crosses a JSON boundary and is fed straight into DTW, where a NaN tolerance or a
+ * truncated reference would quietly score every move as zero. Phones check it before dancing.
+ */
+export function validChart(c) {
+  return !!c && typeof c === 'object'
+    && Number.isFinite(c.accScale) && c.accScale > 0
+    && Number.isFinite(c.gyrScale) && c.gyrScale > 0
+    && Array.isArray(c.segments) && c.segments.length > 0
+    && c.segments.every((s) => Number.isInteger(s.i) && Number.isFinite(s.start) && Number.isFinite(s.end) && s.end > s.start
+      && Number.isFinite(s.tol) && s.tol > 0
+      && Array.isArray(s.ref) && s.ref.length > 0 && s.ref.length % DIMS === 0
+      && s.ref.every((v) => Number.isFinite(v)));
+}
+
 /** Down-sampled intensity curve for drawing (e.g. "reference vs you" on the phone). */
 export function intensityCurve(chart, seg, samples, points = 60) {
   const ref = Float64Array.from(seg.ref);

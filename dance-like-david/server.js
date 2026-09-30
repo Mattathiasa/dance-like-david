@@ -9,7 +9,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import QRCode from 'qrcode';
-import { buildChart, validSamples } from './shared/motion.js';
+import { buildChart, validSamples, validChart } from './shared/motion.js';
 import { readJson, writeJson, updateJson, createJson, httpError } from './lib/fsjson.js';
 import { createAccounts } from './lib/accounts.js';
 import { createResults } from './lib/results.js';
@@ -388,6 +388,7 @@ app.post('/api/songs/:id/build', admin, withSong, wrap(async (req, res) => {
 app.get('/api/songs/:id/chart', withSong, publicOrAdmin, wrap(async (req, res) => {
   const chart = await loadChart(req.meta.id);
   if (!chart) return res.status(404).json({ error: 'No moves yet — record takes in the Studio' });
+  if (!validChart(chart)) return res.status(409).json({ error: 'This song’s chart is broken — rebuild it in the Studio' });
   res.json({ ...chart, segments: chart.segments.map(({ _refArr, ...s }) => s) });
 }));
 
