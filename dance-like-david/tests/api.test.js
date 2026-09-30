@@ -214,7 +214,6 @@ test('Phase 8: game — TV hosts, 2 phones dance, Wi-Fi drop + rejoin, official 
   const dancers = [samplesFor(makeDancer('good', 303), -1000, 16000), samplesFor(makeDancer('shake', 5), -1000, 16000)];
   phones.forEach((p, k) => {
     for (const m of moves) {
-      const r = scoreDetail(S.chart, m, dancers[k]);
       p.send({ t: 'toHost', msg: gradeFor(S.chart, m, dancers[k]) });
       p.send({ t: 'toHost', msg: { ...gradeFor(S.chart, m, dancers[k]), name: 'PERFECT', points: 100 } }); // duplicate must be ignored
     }
@@ -319,7 +318,7 @@ test('Phase 11: practice mode — grades relayed but not tallied as a real game'
   await new Promise((r) => setTimeout(r, 200));
   // send practiceStart — server creates a practice game, which should not tally the grade
   tv.send({ t: 'toPlayers', msg: { type: 'practiceStart', songId: S.song.id } });
-  const ps = await p.wait((m) => m.t === 'msg' && m.msg.type === 'practiceStart');
+  await p.wait((m) => m.t === 'msg' && m.msg.type === 'practiceStart');
   // phone sends a practice grade
   p.send({ t: 'toHost', msg: { type: 'grade', practice: true, seg: moves[0].i, name: 'PERFECT', points: 100 } });
   await new Promise((r) => setTimeout(r, 200));
@@ -353,7 +352,6 @@ test('Phase 12: teams mode — averages per-team, winner is the higher average',
   const dancers = [samplesFor(makeDancer('good', 303), -1000, 16000), samplesFor(makeDancer('shake', 5), -1000, 16000)];
   phones.forEach((p, k) => {
     for (const m of moves) {
-      const r = scoreDetail(S.chart, m, dancers[k]);
       p.send({ t: 'toHost', msg: gradeFor(S.chart, m, dancers[k]) });
     }
   });

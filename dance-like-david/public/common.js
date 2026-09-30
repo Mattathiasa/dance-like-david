@@ -21,7 +21,7 @@ export const fmtTime = (ms) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 export const fmtNum = (n) => Number(n || 0).toLocaleString('en-US');
-export const ordinal = (n) => `${n}${[, 'st', 'nd', 'rd'][(n % 100 >> 3 ^ 1) && n % 10] || 'th'}`;
+export const ordinal = (n) => `${n}${{ 1: 'st', 2: 'nd', 3: 'rd' }[(n % 100 >> 3 ^ 1) && n % 10] || 'th'}`;
 export const PALETTE = ['#F2C14E', '#3DD9B5', '#FF7A6B', '#9B7BFF', '#7AB0FF'];
 export const colorFor = (s = '') => PALETTE[[...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % PALETTE.length];
 export const initials = (t = '') => t.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '?';

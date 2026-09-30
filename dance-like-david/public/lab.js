@@ -1,8 +1,8 @@
 // Move Lab: record an action on your phone, then try it and get a score. No song, TV or laptop needed.
-import { $, $$, el, api, auth, store, sleep, fmtNum, avatar, toast } from './common.js';
+import { $, $$, el, api, auth, store, sleep, avatar, toast } from './common.js';
 import { icon, MOVE_ICONS, MOVE_ICON_LABELS } from './icons.js';
 import { MotionCapture, keepAwake } from './motion-capture.js';
-import { scoreDetail, intensityCurve, TIERS, validChart } from '/shared/motion.js';
+import { scoreDetail, intensityCurve, validChart } from '/shared/motion.js';
 
 const LEAD_MS = 600;
 const motion = new MotionCapture();

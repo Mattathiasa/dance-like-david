@@ -391,7 +391,7 @@ export function validChart(c) {
 
 /** Down-sampled intensity curve for drawing (e.g. "reference vs you" on the phone). */
 export function intensityCurve(chart, seg, samples, points = 60) {
-  const ref = Float64Array.from(seg.ref);
+  const envR = envelope(Float64Array.from(seg.ref)); // the stored reference is already scaled
   let envP = null;
   if (samples) envP = envelope(scaleGrid(resample(samples, seg.start, seg.end), chart.accScale, chart.gyrScale));
   const pick = (env) => Array.from({ length: points }, (_, i) => {

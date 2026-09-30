@@ -8,7 +8,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test --test-reporter=spec tests/scoring.test.js tests/api.test.js",
-    "test:e2e": "node tests/e2e.mjs"
+    "test:e2e": "node tests/e2e.mjs",
+    "lint": "eslint ."
   },
   "engines": {
     "node": ">=18"
@@ -19,6 +20,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "eslint": "^9.39.5",
     "playwright": "^1.56.0"
   }
 }

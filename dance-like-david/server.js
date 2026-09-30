@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import QRCode from 'qrcode';
 import { buildChart, validSamples, validChart } from './shared/motion.js';
-import { readJson, writeJson, updateJson, createJson, httpError } from './lib/fsjson.js';
+import { readJson, writeJson, updateJson, createJson } from './lib/fsjson.js';
 import { createAccounts } from './lib/accounts.js';
 import { createResults } from './lib/results.js';
 import { attachRooms } from './lib/rooms.js';

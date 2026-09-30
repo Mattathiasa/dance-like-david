@@ -329,7 +329,8 @@ async function recordTake() {
   const overlay = $('#overlay');
   try {
     await player.load(`/api/songs/${s.id}/audio`, { 'x-admin-pass': pass });
-    let recorder = null, chunks = [], recStartServer = null;
+    let recorder = null, recStartServer = null;
+    const chunks = [];
     if (A.cam) {
       const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'].find((t) => MediaRecorder.isTypeSupported(t));
       recorder = new MediaRecorder(A.cam, mime ? { mimeType: mime, videoBitsPerSecond: 2_500_000 } : undefined);

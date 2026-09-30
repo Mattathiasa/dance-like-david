@@ -1,7 +1,7 @@
 // Phase 6 (simulated): does the scoring engine tell good dancing from bad?
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildChart, scoreDetail, alignTakes, accuracyFromRatio, validChart } from '../shared/motion.js';
+import { buildChart, scoreDetail, alignTakes, accuracyFromRatio, validChart, intensityCurve } from '../shared/motion.js';
 import { makeDancer, samplesFor } from './sim.js';
 
 const meta = { id: 'x', bpm: 120, beatsPerMove: 4, firstBeatMs: 0, durationMs: 16000 };
@@ -64,4 +64,12 @@ test('a chart the phones can trust passes validChart, a broken one does not', ()
   const bad = { ...chart, segments: [{ ...chart.segments[0], ref: [1, 2, NaN] }] };
   assert.ok(!validChart(bad));
   assert.ok(!validChart({ ...chart, segments: [{ ...chart.segments[0], tol: 0 }] }));
+});
+
+test('the reference-vs-you curve draws both lines', () => {
+  const c = intensityCurve(chart, moves[0], samplesFor(makeDancer('good', 303), -1000, 17000), 40);
+  assert.equal(c.ref.length, 40);
+  assert.equal(c.you.length, 40);
+  assert.ok(c.ref.every((v) => Number.isFinite(v) && v > 0), 'the reference line has shape');
+  assert.equal(intensityCurve(chart, moves[0], null, 40).you, null, 'no samples, no player line');
 });

@@ -1,5 +1,5 @@
 // Big screen: song library, lobby, solo/team gameplay, practice loops, results, leaderboard.
-import { $, $$, el, api, Link, SongPlayer, store, fmtTime, fmtNum, ordinal, coverEl, avatar, toast, sleep, colorFor } from './common.js';
+import { $, $$, el, api, Link, SongPlayer, store, fmtTime, fmtNum, ordinal, coverEl, avatar, toast, colorFor } from './common.js';
 import { icon, dancerFigure, defaultMoveIcon } from './icons.js';
 
 const GENRES = ['K-pop', 'Pop', 'Afrobeats', 'Worship', 'Kids', 'Other'];
@@ -237,7 +237,7 @@ function renderDancers() {
   const box = $('#dancers');
   box.replaceChildren();
   if (!n) box.append(el('p', { class: 'muted' }, 'Waiting for dancers… open the link or scan the code on a phone.'));
-  for (const [id, p] of S.players) {
+  for (const p of S.players.values()) {
     let state, tone;
     if (!p.connected) { state = 'Reconnecting'; tone = 'tone-coral'; }
     else if (!p.ready) { state = 'Grip check'; tone = 'tone-gold'; }
