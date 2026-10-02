@@ -9,7 +9,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import QRCode from 'qrcode';
-import { buildChart, validSamples, validChart } from './shared/motion.js';
+import { buildChart, groupSegments, segmentsFor, validSamples, validChart } from './shared/motion.js';
 import { readJson, writeJson, updateJson, createJson } from './lib/fsjson.js';
 import { createAccounts } from './lib/accounts.js';
 import { createResults } from './lib/results.js';
@@ -124,9 +124,31 @@ async function rebuild(id) {
   }
   const p = path.join(songDir(id), 'chart.json');
   if (!takes.length) { await fsp.rm(p, { force: true }); return null; }
-  const chart = buildChart(meta, takes);
+  const chart = groupSegments(buildChart(meta, takes));
   await writeJson(p, chart);
   return chart;
+}
+
+/**
+ * Carry move names across a change to the beat grid. A move is remembered by the moment it
+ * happened, so nudging the first beat or correcting the BPM re-cuts the song without throwing
+ * away the naming — which is the most tedious part of authoring and used to be wiped here.
+ */
+function remapMoves(oldMeta, newMeta) {
+  const named = oldMeta.moves || {};
+  if (!Object.keys(named).length) return {};
+  const oldSegs = segmentsFor(oldMeta);
+  const newSegs = segmentsFor(newMeta);
+  if (!oldSegs.length || !newSegs.length) return {};
+  const out = {};
+  for (const [i, mv] of Object.entries(named)) {
+    const was = oldSegs[Number(i)];
+    if (!was) continue;
+    const mid = (was.start + was.end) / 2;
+    const lands = newSegs.find((x) => mid >= x.start && mid < x.end);
+    if (lands && !(lands.i in out)) out[lands.i] = mv;
+  }
+  return out;
 }
 
 // ---------- http ----------
@@ -163,7 +185,20 @@ const isAdmin = (req) => {
   const a = Buffer.from(req.get('x-admin-pass') || ''), b = Buffer.from(ADMIN_PASSWORD);
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 };
-const admin = (req, res, next) => (isAdmin(req) ? next() : res.status(401).json({ error: 'Admin password required' }));
+// A wrong admin password on any route is as much a guess as one at /api/login, so it costs the
+// same. Only failures are counted, so a working studio session is never throttled.
+const ADMIN_FAIL_MAX = 10;
+const ADMIN_FAIL_WINDOW = 60000;
+const adminFails = new Map();
+const admin = (req, res, next) => {
+  if (isAdmin(req)) return next();
+  const t = Date.now();
+  const h = (adminFails.get(req.ip) || []).filter((x) => x > t - ADMIN_FAIL_WINDOW);
+  h.push(t);
+  adminFails.set(req.ip, h);
+  if (h.length > ADMIN_FAIL_MAX) return res.status(429).json({ error: 'Too many attempts — wait a minute' });
+  return res.status(401).json({ error: 'Admin password required' });
+};
 const withSong = wrap(async (req, res, next) => {
   const meta = await getMeta(req.params.id);
   if (!meta) return res.status(404).json({ error: 'Song not found' });
@@ -188,14 +223,19 @@ const limit = (max, windowMs) => (req, res, next) => {
   if (h.length > max) return res.status(429).json({ error: 'Too many attempts — wait a minute' });
   next();
 };
-setInterval(() => { const t = Date.now() - 600000; for (const [k, v] of hits) if (!v.some((x) => x > t)) hits.delete(k); }, 600000).unref();
+setInterval(() => {
+  const t = Date.now() - 600000;
+  for (const [k, v] of hits) if (!v.some((x) => x > t)) hits.delete(k);
+  for (const [k, v] of adminFails) if (!v.some((x) => x > t)) adminFails.delete(k);
+}, 600000).unref();
 
 const extFor = (ct = '') =>
   ct.includes('mp4') ? 'mp4' : ct.includes('webm') ? 'webm' : ct.includes('mpeg') || ct.includes('mp3') ? 'mp3'
   : ct.includes('wav') ? 'wav' : ct.includes('ogg') ? 'ogg' : ct.includes('aac') || ct.includes('m4a') ? 'm4a'
+  : ct.includes('flac') ? 'flac' : ct.includes('opus') ? 'opus'
   : ct.includes('png') ? 'png' : ct.includes('jpeg') || ct.includes('jpg') ? 'jpg' : ct.includes('webp') ? 'webp' : 'bin';
 
-const lab = await createLab({ dataDir: DATA, isAdmin, accounts, limit, bearer });
+const lab = await createLab({ dataDir: DATA, isAdmin, admin, accounts, limit, bearer });
 app.use(lab.router);
 
 app.get('/api/health', (req, res) => res.json({ ok: true, uptime: process.uptime() }));
@@ -282,7 +322,7 @@ app.patch('/api/songs/:id', admin, json, withSong, wrap(async (req, res) => {
     for (const other of ids) if (other !== req.meta.id && (await getMeta(other))?.featured) await updateMeta(other, (m) => { m.featured = false; });
   }
    const meta = await updateMeta(req.meta.id, (m) => cleanSongFields(body, m));
-  if (timingChanged) { await updateMeta(meta.id, (m) => { m.moves = {}; }); await rebuild(meta.id); }
+  if (timingChanged) { await updateMeta(meta.id, (m) => { m.moves = remapMoves(req.meta, m); }); await rebuild(meta.id); }
   invalidateSongCache();
   res.json(await songSummary(await getMeta(meta.id), { full: true }));
 }));

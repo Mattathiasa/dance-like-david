@@ -194,6 +194,48 @@ export function buildChart(meta, takes) {
   };
 }
 
+/**
+ * Mark segments that are the same dance as each other, so the admin names a chorus once
+ * instead of twelve times. Sets `group` on every scored segment and returns the chart.
+ *
+ * Two segments group when the distance between their references is small enough that
+ * dancing one where the other was expected would still grade PERFECT — the same threshold
+ * the grader uses, so "the same move" means the same thing here as it does when scoring.
+ * Envelope correlation prunes the pairs first: a full DTW on every pair of a 90-move song
+ * is work we don't need to do to know that a rest and a spin are different.
+ */
+export function groupSegments(chart) {
+  const segs = (chart.segments || []).filter((s) => !s.rest && Array.isArray(s.ref) && s.ref.length);
+  for (const s of chart.segments || []) delete s.group;
+  if (segs.length < 2) {
+    if (segs.length) segs[0].group = 0;
+    if (chart.report) chart.report.moveGroups = segs.length;
+    return chart;
+  }
+  const refs = segs.map((s) => Float64Array.from(s.ref));
+  const envs = refs.map((r) => envelope(r));
+  const parent = segs.map((_, i) => i);
+  const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const union = (a, b) => { const x = find(a), y = find(b); if (x !== y) parent[Math.max(x, y)] = Math.min(x, y); };
+
+  for (let i = 0; i < segs.length; i++) {
+    for (let j = i + 1; j < segs.length; j++) {
+      if (find(i) === find(j)) continue;
+      const n = Math.min(envs[i].length, envs[j].length);
+      if (!n || pearson(envs[i], envs[j], 0, n) < 0.8) continue;
+      if (dtw(refs[i], refs[j]) <= Math.min(segs[i].tol, segs[j].tol) * TIERS[0].max) union(i, j);
+    }
+  }
+  const ids = new Map();
+  for (let i = 0; i < segs.length; i++) {
+    const root = find(i);
+    if (!ids.has(root)) ids.set(root, ids.size);
+    segs[i].group = ids.get(root);
+  }
+  if (chart.report) chart.report.moveGroups = ids.size;
+  return chart;
+}
+
 /** Grade one move. Kept for callers that only need the tier; see scoreDetail for the full picture. */
 export function gradeSegment(chart, seg, samples, opts = {}) {
   return scoreDetail(chart, seg, samples, opts);

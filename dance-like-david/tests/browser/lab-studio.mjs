@@ -124,8 +124,13 @@ await studio.fill('#pass', process.env.PASS);
 await studio.click('#login button');
 await studio.waitForSelector('#app:not([hidden])');
 await studio.fill('#title', 'Neon Hearts');
-await studio.fill('#bpm', '120');
 await studio.setInputFiles('#audio', process.env.WAV);
+// the audio now volunteers its own tempo, so the BPM field is filled in rather than typed
+await studio.waitForSelector('#gridCheck:not([hidden])', { timeout: 20000 });
+const detectedBpm = Number(await studio.inputValue('#bpm'));
+log('studio detected BPM:', detectedBpm);
+// the browser resamples the 22 kHz fixture to the audio context's rate, so allow a little slack
+if (!(Math.abs(detectedBpm - 120) < 1)) errors.push(`studio: the audio should set the BPM to about 120, got ${detectedBpm}`);
 await studio.click('#formBtn');
 await studio.waitForSelector('#v-record:not([hidden])', { timeout: 20000 });
 await studio.waitForFunction(() => /^\d{4}$/.test(document.querySelector('#roomCode').textContent));

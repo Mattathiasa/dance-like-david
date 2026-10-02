@@ -58,11 +58,22 @@
           <label class="field">Beats per move<select id="bpmv"><option>2</option><option selected>4</option><option>8</option></select></label>
           <label class="field">First beat (ms)<input id="first" type="number" min="0" value="0"></label>
         </div>
+        <div class="stack" id="gridCheck" style="gap:8px" hidden>
+          <span class="muted" style="font-size:13px;font-weight:600" id="gridLabel"></span>
+          <canvas id="gridCanvas" width="640" height="76" style="width:100%;height:76px;border-radius:12px;background:var(--surface-2)" role="img" aria-label="Detected beats over the start of the song"></canvas>
+          <div class="row" style="flex-wrap:nowrap;gap:6px">
+            <span class="muted grow" style="font-size:12px">Marks should sit on the beat</span>
+            <button type="button" data-nudge="-half" style="min-height:32px;padding:0 8px;font-size:12px">&minus;&frac12;</button>
+            <button type="button" data-nudge="-20" style="min-height:32px;padding:0 8px;font-size:12px">&minus;20ms</button>
+            <button type="button" data-nudge="20" style="min-height:32px;padding:0 8px;font-size:12px">+20ms</button>
+            <button type="button" data-nudge="half" style="min-height:32px;padding:0 8px;font-size:12px">+&frac12;</button>
+          </div>
+        </div>
         <div class="row">
           <label class="check"><input type="checkbox" id="family" checked> Family-friendly</label>
           <label class="check"><input type="checkbox" id="featured"> Feature on the TV</label>
         </div>
-        <label class="drop" id="audioDrop"><input type="file" id="audio" accept="audio/*"><span id="audioLabel">Choose audio file (mp3, m4a, wav)</span></label>
+        <label class="drop" id="audioDrop"><input type="file" id="audio"><span id="audioLabel">Choose a music file (mp3, m4a, wav, ogg, flac)</span></label>
         <p class="muted" style="font-size:13px;line-height:1.45">Private rooms: use audio you own. Before this server is public, commercial K-pop and pop tracks need a license — use royalty-free music or tracks with the artist’s permission.</p>
         <p class="error" id="formErr" role="alert"></p>
         <button class="btn-primary btn-lg" id="formBtn">Create and start recording</button>
@@ -93,7 +104,7 @@
         <div class="phone-state" id="phoneState"></div>
         <span class="muted" style="font-size:13px">Open <b id="joinUrl" style="color:var(--text)"></b> on your phone and enter <b style="color:var(--gold);font-size:16px" id="roomCode">····</b></span>
       </div>
-      <div class="spread"><h2 style="font-size:20px;font-weight:700">Takes</h2><span class="muted" style="font-size:13px">Aim for 3–5</span></div>
+      <div class="spread"><h2 style="font-size:20px;font-weight:700">Takes</h2><span class="muted" style="font-size:13px">One is playable, 3 is fair</span></div>
       <div class="stack" id="takes" style="gap:10px"></div>
       <p id="takeNote" class="tile" hidden style="background:var(--gold-bg);font-size:14px;line-height:1.45"></p>
       <button class="btn-primary btn-lg" id="toMoves" style="margin-top:auto">Review moves</button>
@@ -107,13 +118,15 @@
       <div class="stack" style="gap:8px">
         <div class="timeline" id="timeline" role="group" aria-label="Moves timeline"></div>
         <div class="spread muted" style="font-size:12px" id="timeTicks"></div>
-        <div class="legend"><span><i style="background:var(--teal)"></i>Consistent</span><span><i style="background:var(--gold)"></i>Loose, scored leniently</span><span><i style="background:var(--surface-2)"></i>Rest, not scored</span></div>
+        <div class="legend"><span><i style="background:var(--teal)"></i>Consistent</span><span><i style="background:var(--gold)"></i>Loose, scored leniently</span><span><i style="background:var(--surface-2)"></i>Rest, not scored</span><span><i style="background:var(--violet,#9B7BFF)"></i>Selected move repeats here</span></div>
       </div>
       <div style="overflow:auto;max-height:52vh"><table><thead><tr><th>#</th><th>Move</th><th>Time</th><th>Consistency</th><th>Players miss it</th></tr></thead><tbody id="moveRows"></tbody></table></div>
     </main>
     <aside class="saside">
       <span class="muted" style="font-size:13px;font-weight:600" id="mvHead"></span>
       <label class="field">Name shown to players<input id="mvName" maxlength="40"></label>
+      <p class="tile" id="mvRepeats" hidden style="background:var(--gold-bg);font-size:13px;line-height:1.45"></p>
+      <button type="button" id="mvCopyPrev" style="min-height:34px;font-size:13px">Copy the previous move’s name</button>
       <div class="stack" style="gap:8px"><span class="muted" style="font-size:13px;font-weight:600">Pictogram</span><div class="icons" id="mvIcons"></div></div>
       <div class="stack" style="gap:8px">
         <div class="spread"><label for="mvStrict" class="muted" style="font-size:13px;font-weight:600">Strictness</label><span id="mvStrictLabel" style="font-size:13px"></span></div>

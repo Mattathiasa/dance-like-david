@@ -85,13 +85,13 @@ test('Phase 1: server is healthy', async () => {
 });
 
 test('Phase 2: every page loads with security headers', async () => {
-  for (const [p, text] of [['/', 'Dance Like David'], ['/screen', 'Big screen'], ['/phone', 'Join the dance'], ['/lab', 'Move Lab'], ['/studio', 'Studio']]) {
+  for (const [p, text] of [['/', 'Dance Like David'], ['/screen', 'Big screen'], ['/phone', 'Join the dance'], ['/lab', 'Move Lab'], ['/studio', 'Studio'], ['/record', 'Record a song']]) {
     const r = await call(p);
     assert.equal(r.status, 200, p);
     assert.ok(r.body.includes(text), `${p} should mention "${text}"`);
     assert.ok(r.headers.get('content-security-policy')?.includes("default-src 'self'"), `${p} CSP`);
   }
-  for (const f of ['/common.js', '/icons.js', '/motion-capture.js', '/screen.js', '/phone.js', '/studio.js', '/lab.js', '/shared/motion.js', '/style.css']) {
+  for (const f of ['/common.js', '/icons.js', '/motion-capture.js', '/screen.js', '/phone.js', '/studio.js', '/lab.js', '/record.js', '/beat-grid.js', '/shared/motion.js', '/shared/beats.js', '/style.css', '/record.css']) {
     assert.equal((await call(f)).status, 200, f);
   }
   const qr = await call('/api/qr?text=https%3A%2F%2Fexample.test%2Fphone%3Fcode%3D1234');
@@ -511,4 +511,59 @@ test('Phase 18: leaderboards and profiles survive a restart', async () => {
   assert.equal(me2.bestStreak, me.bestStreak);
   const all = (await call('/api/leaderboard?period=all')).body.rows;
   assert.ok(all.length && all[0].points >= all[all.length - 1].points, 'all-time totals still add up');
+});
+
+// ---------------- Phase 19: a changed beat grid re-cuts the song without losing the names ----------------
+test('Phase 19: move names follow their moment when the BPM changes', async () => {
+  const id = (await call('/api/songs', { method: 'POST', admin: true, body: { title: 'Remap', bpm: 120, beatsPerMove: 4 } })).body.id;
+  await call(`/api/songs/${id}/audio`, { method: 'PUT', admin: true, body: clickTrack(16, 120), headers: { 'content-type': 'audio/wav', 'x-duration-ms': '16000' } });
+  // at 120 BPM a move is 2 s, so move 0 happens around 1 s and move 2 around 5 s
+  await call(`/api/songs/${id}`, { method: 'PATCH', admin: true, body: { moves: { 0: { name: 'Clap', icon: 'clap', strict: 1 }, 2: { name: 'Spin', icon: 'spin', strict: 1 } } } });
+  // at 160 BPM a move is 1.5 s, so 5 s now falls in move 3
+  const r = await call(`/api/songs/${id}`, { method: 'PATCH', admin: true, body: { bpm: 160 } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.moves[0]?.name, 'Clap', 'a move at the start stays where it is');
+  assert.equal(r.body.moves[3]?.name, 'Spin', 'a move at 5 s moves to the segment that now covers 5 s');
+  assert.equal(r.body.moves[3]?.icon, 'spin', 'the pictogram comes along');
+  assert.equal(r.body.moves[2], undefined, 'and does not stay behind at its old index');
+  await call(`/api/songs/${id}`, { method: 'DELETE', admin: true });
+});
+
+// ---------------- Phase 20: a patch take only changes the part of the song it covers ----------------
+test('Phase 20: a take covering 4–8 s leaves the rest of the chart alone', async () => {
+  const id = (await call('/api/songs', { method: 'POST', admin: true, body: { title: 'Patch', bpm: 120, beatsPerMove: 4 } })).body.id;
+  await call(`/api/songs/${id}/audio`, { method: 'PUT', admin: true, body: clickTrack(16, 120), headers: { 'content-type': 'audio/wav', 'x-duration-ms': '16000' } });
+  for (const n of [1, 2]) {
+    await call(`/api/songs/${id}/takes`, { method: 'POST', admin: true, body: { samples: samplesFor(makeDancer('good', n * 7), -500, 15500), durationMs: 15000 } });
+  }
+  const before = (await call(`/api/songs/${id}`, { admin: true })).body.chart.segments;
+  assert.ok(before.every((s) => s.takes.join() === '1,2'), 'both full takes cover every move');
+
+  await call(`/api/songs/${id}/takes`, { method: 'POST', admin: true, body: { samples: samplesFor(makeDancer('good', 99), 3800, 8200), durationMs: 4400 } });
+  const after = (await call(`/api/songs/${id}`, { admin: true })).body.chart.segments;
+  const patched = [2, 3]; // the two 2-second moves inside 4000–8000 ms
+  assert.equal(after.length, before.length, 'a patch take adds no moves and removes none');
+  for (const s of after) {
+    const inPatch = patched.includes(s.i);
+    assert.equal(s.takes.includes(3), inPatch, `move ${s.i} ${inPatch ? 'is inside' : 'is outside'} the patch`);
+    if (inPatch) continue;
+    const was = before.find((b) => b.i === s.i);
+    assert.equal(s.tol, was.tol, `move ${s.i}'s strictness is untouched`);
+    assert.equal(s.refTake, was.refTake, `move ${s.i} keeps its reference take`);
+  }
+  assert.ok(after.some((s) => patched.includes(s.i)), 'the patched moves are actually in the chart');
+  await call(`/api/songs/${id}`, { method: 'DELETE', admin: true });
+});
+
+// ---------------- Phase 21: guessing the admin password is throttled everywhere, not just /api/login ----------------
+test('Phase 21: wrong admin passwords on an ordinary admin route start returning 429', async () => {
+  const guess = { method: 'POST', headers: { 'x-admin-pass': 'not-the-password' }, body: { title: 'x', bpm: 120 } };
+  let blocked = 0;
+  for (let i = 0; i < 16 && !blocked; i++) {
+    const r = await call('/api/songs', guess);
+    if (r.status === 429) blocked = i + 1;
+    else assert.equal(r.status, 401, `guess ${i + 1} should be rejected`);
+  }
+  assert.ok(blocked, 'guessing is eventually refused outright');
+  assert.equal((await call('/api/songs', { admin: true })).status, 200, 'the real admin is never locked out');
 });

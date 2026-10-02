@@ -30,7 +30,7 @@ const run = (cmd, args, extra = {}) => new Promise((resolve) => {
 });
 
 let failed = 0;
-for (const script of ['lab-studio.mjs', 'game.mjs']) {
+for (const script of ['record.mjs', 'lab-studio.mjs', 'game.mjs']) {
   const data = fs.mkdtempSync(path.join(TMP, 'data-'));
   const server = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...env, DATA_DIR: data }, stdio: 'ignore' });
   for (let i = 0; i < 100; i++) { try { if ((await fetch(`${env.BASE}/api/health`)).ok) break; } catch { /* starting */ } await new Promise((r) => setTimeout(r, 100)); }

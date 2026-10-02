@@ -46,6 +46,20 @@ export const auth = {
   clear() { store.del('ddl.token'); store.del('ddl.user'); },
 };
 
+/**
+ * What the file pickers offer. Concrete types rather than `audio/*`: the wildcard makes iOS
+ * offer the voice recorder and the photo library, when music lives in the Files browser.
+ */
+export const AUDIO_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/opus', 'audio/flac', 'audio/x-flac'];
+export const AUDIO_ACCEPT = [...AUDIO_TYPES, '.mp3', '.m4a', '.aac', '.wav', '.ogg', '.oga', '.opus', '.flac'].join(',');
+
+/** Pickers on some phones hand over a file with no type at all; the name still knows. */
+export function audioTypeOf(file) {
+  if (file.type && file.type.startsWith('audio')) return file.type;
+  const ext = (file.name.match(/\.([a-z0-9]+)$/i)?.[1] || '').toLowerCase();
+  return { mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/opus', flac: 'audio/flac' }[ext] || 'audio/mpeg';
+}
+
 export async function api(path, { method = 'GET', body, headers = {}, pass, token = auth.token } = {}) {
   const h = { ...headers };
   if (pass) h['x-admin-pass'] = pass;
@@ -195,7 +209,9 @@ export class Link extends EventTarget {
  * startAt(startServer, { fromMs, toMs, speed }) plays a section, optionally slowed down (practice).
  */
 export class SongPlayer {
-  constructor(link) { this.link = link; this.ctx = null; this.buffer = null; this.src = null; this.startServer = null; this.fromMs = 0; this.speed = 1; }
+  // Without a Link there is no room and no shared clock to keep: the phone that plays the
+  // song is the one that records against it, so its own clock is the only one that matters.
+  constructor(link = { serverNow: () => performance.now() }) { this.link = link; this.ctx = null; this.buffer = null; this.src = null; this.startServer = null; this.fromMs = 0; this.speed = 1; }
   async load(url, headers = {}) {
     this.ctx ||= new (window.AudioContext || window.webkitAudioContext)();
     const res = await fetch(url, { headers });

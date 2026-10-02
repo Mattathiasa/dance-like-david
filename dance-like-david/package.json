@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test --test-reporter=spec tests/scoring.test.js tests/api.test.js",
+    "test": "node --test --test-reporter=spec tests/scoring.test.js tests/beats.test.js tests/api.test.js",
     "test:e2e": "node tests/e2e.mjs",
     "lint": "eslint ."
   },

@@ -1,6 +1,8 @@
 // Studio (super admin): create songs, record reference takes (phone + webcam), name moves, publish.
-import { $, $$, el, api, Link, SongPlayer, sleep, fmtTime, fmtNum, coverEl, toast } from './common.js';
+import { $, $$, el, api, Link, SongPlayer, sleep, fmtTime, fmtNum, coverEl, toast, AUDIO_ACCEPT, audioTypeOf } from './common.js';
 import { icon, MOVE_ICONS, MOVE_ICON_LABELS, defaultMoveIcon, dancerFigure } from './icons.js';
+import { detectTempo, monoFromBuffer } from '/shared/beats.js';
+import { drawBeatGrid } from './beat-grid.js';
 
 let pass = '';
 try { pass = sessionStorage.getItem('ddl.pass') || ''; } catch { /* ignore */ }
@@ -8,7 +10,7 @@ const link = new Link();
 const player = new SongPlayer(link);
 const A = {
   songs: [], filter: 'all', song: null, editing: null, phone: null, cam: null, recording: null,
-  roomCode: null, roomSecret: null, selSeg: null, taps: [], coverFile: null,
+  roomCode: null, roomSecret: null, selSeg: null, taps: [], coverFile: null, grid: null,
 };
 const pendingTakes = new Map();
 const adm = (path, opts = {}) => api(path, { ...opts, pass, token: null });
@@ -138,6 +140,8 @@ function renderForm() {
   $('#family').checked = s ? s.familyFriendly !== false : true;
   $('#featured').checked = !!s?.featured;
   $('#audio').value = '';
+  A.grid = null;
+  $('#gridCheck').hidden = true;
   $('#audioLabel').textContent = s?.audio ? `Audio uploaded (${fmtTime(s.durationMs)}) — choose a file to replace it` : 'Choose audio file (mp3, m4a, wav)';
   $('#cover').value = '';
   const drop = $('#coverDrop');
@@ -155,7 +159,56 @@ $('#cover').addEventListener('change', (e) => {
   $$('img, span', drop).forEach((n) => n.remove());
   drop.append(el('img', { src: URL.createObjectURL(f), alt: 'New cover preview' }));
 });
-$('#audio').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) $('#audioLabel').textContent = f.name; });
+$('#audio').accept = AUDIO_ACCEPT; // set here so the list lives in one place
+$('#audio').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  A.grid = null;
+  drawGrid();
+  if (!f) return;
+  $('#audioLabel').textContent = `${f.name} — listening for the beat…`;
+  $('#formBtn').disabled = true; // the BPM it is about to fill in is the whole point of waiting
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  try {
+    const buf = await ctx.decodeAudioData(await f.arrayBuffer());
+    const d = detectTempo(monoFromBuffer(buf), buf.sampleRate);
+    A.grid = { file: f, durationMs: Math.round(buf.duration * 1000), onset: d.onset, onsetHz: d.onsetHz, confidence: d.confidence };
+    if (d.bpm) {
+      $('#bpm').value = d.bpm.toFixed(1);
+      $('#first').value = String(d.firstDownbeatMs);
+      $('#tapBtn').textContent = `Tap tempo · ${Math.round(d.bpm)}`;
+    }
+    $('#audioLabel').textContent = d.bpm ? `${f.name} — ${Math.round(d.bpm)} BPM detected` : `${f.name} — no clear beat, set the BPM by hand`;
+  } catch (ex) {
+    $('#audioLabel').textContent = `${f.name} — could not read it (${ex.message})`;
+  } finally {
+    try { ctx.close(); } catch { /* already closed */ }
+    $('#formBtn').disabled = false;
+    drawGrid();
+  }
+});
+
+/** The detected grid over the first bars. Reads the fields, so typing or nudging redraws it. */
+function drawGrid() {
+  const box = $('#gridCheck');
+  if (!A.grid?.onset?.length) { box.hidden = true; return; }
+  box.hidden = false;
+  const bpm = Number($('#bpm').value);
+  const firstBeatMs = Math.max(0, Number($('#first').value) || 0);
+  const beatsPerBar = Number($('#bpmv').value) || 4;
+  $('#gridLabel').textContent = !(bpm > 0)
+    ? 'No tempo yet — tap along to the song and the marks will appear'
+    : A.grid.confidence >= 2
+      ? 'Detected beat — check the marks land on it'
+      : 'Faint beat: check this carefully, or tap the tempo instead';
+  drawBeatGrid($('#gridCanvas'), { ...A.grid, bpm, firstBeatMs, beatsPerBar: Math.min(4, beatsPerBar) });
+}
+for (const id of ['bpm', 'first', 'bpmv']) $(`#${id}`).addEventListener('input', drawGrid);
+for (const b of $$('#gridCheck [data-nudge]')) b.addEventListener('click', () => {
+  const beatMs = 60000 / (Number($('#bpm').value) || 120);
+  const by = b.dataset.nudge === 'half' ? beatMs / 2 : b.dataset.nudge === '-half' ? -beatMs / 2 : Number(b.dataset.nudge);
+  $('#first').value = String(Math.max(0, Math.round((Number($('#first').value) || 0) + by)));
+  drawGrid();
+});
 
 $('#tapBtn').addEventListener('click', () => {
   const t = performance.now();
@@ -181,7 +234,8 @@ $('#songForm').addEventListener('submit', async (e) => {
     if (!(Number($('#bpm').value) > 30)) throw new Error('Set the BPM (tap along to the song if you don’t know it)');
     if (!A.editing && !audio) throw new Error('Choose the audio file');
     let durationMs = null;
-    if (audio) {
+    if (audio && A.grid?.file === audio) durationMs = A.grid.durationMs;
+    else if (audio) {
       btn.textContent = 'Reading audio…';
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       durationMs = Math.round((await ctx.decodeAudioData(await audio.arrayBuffer())).duration * 1000);
@@ -196,14 +250,14 @@ $('#songForm').addEventListener('submit', async (e) => {
     let id = A.editing?.id;
     if (A.editing) {
       const timing = ['bpm', 'beatsPerMove', 'firstBeatMs'].some((k) => body[k] !== A.editing[k]);
-      if (timing && A.editing.hasChart && !confirm('Changing BPM, beats per move or first beat re-cuts the moves and resets their names. Continue?')) throw new Error('Not saved');
+      if (timing && A.editing.hasChart && !confirm('Changing BPM, beats per move or first beat re-cuts the moves. Names follow their moment in the song, so they are kept. Continue?')) throw new Error('Not saved');
       await adm(`/api/songs/${id}`, { method: 'PATCH', body });
     } else {
       id = (await adm('/api/songs', { method: 'POST', body })).id;
     }
     if (audio) {
       btn.textContent = 'Uploading audio…';
-      await adm(`/api/songs/${id}/audio`, { method: 'PUT', body: audio, headers: { 'content-type': audio.type || 'audio/mpeg', 'x-duration-ms': String(durationMs) } });
+      await adm(`/api/songs/${id}/audio`, { method: 'PUT', body: audio, headers: { 'content-type': audioTypeOf(audio), 'x-duration-ms': String(durationMs) } });
     }
     if (A.coverFile) {
       btn.textContent = 'Uploading cover…';
@@ -245,7 +299,12 @@ function renderTakes() {
   const box = $('#takes');
   box.replaceChildren();
   const scores = new Map((s.chart?.report.takeScores || []).map((t) => [t.n, t]));
-  if (!s.takes?.length && !A.recording) box.append(el('p', { class: 'muted', style: { fontSize: '14px' } }, 'No takes yet. Dance the whole routine the same way 3–5 times. The differences between your takes decide how strict scoring is.'));
+  if (!s.takes?.length && !A.recording) {
+    box.append(el('p', { class: 'muted', style: { fontSize: '14px' } },
+      'No takes yet. One take is enough to publish and play — dancing the routine the same way three times is what measures how strict each move should be, instead of using a default. ',
+      el('a', { href: `/record?song=${s.id}`, style: { fontWeight: 600 } }, 'Record it from your phone instead'),
+      ' if you would rather not run this from a laptop.'));
+  }
   for (const t of s.takes || []) {
     const sc = scores.get(t.n);
     const agreement = sc ? sc.agreement : null;
@@ -270,7 +329,7 @@ function renderTakes() {
   const note = $('#takeNote');
   note.hidden = !oddOnes.length && !(s.takes?.length === 1 || s.takes?.length === 2);
   if (oddOnes.length) note.textContent = `Take ${oddOnes.map((t) => t.n).join(' and ')} disagrees with the others. Delete it or record one more so scoring stays fair.`;
-  else if (s.takes?.length && s.takes.length < 3) note.textContent = `${s.takes.length} take${s.takes.length > 1 ? 's' : ''} so far. With fewer than 3, strictness is a guess — record ${3 - s.takes.length} more.`;
+  else if (s.takes?.length && s.takes.length < 3) note.textContent = `${s.takes.length} take${s.takes.length > 1 ? 's' : ''} — playable right now. ${3 - s.takes.length} more and each move's strictness comes from your own takes rather than a default.`;
 }
 let songsTimer;
 const renderSongsSoon = () => { clearTimeout(songsTimer); songsTimer = setTimeout(() => refreshSongs().catch(() => {}), 300); };
@@ -402,19 +461,34 @@ function segInfo() {
   return { segs, loose: (x) => !x.rest && med && x.tol > med * 2 };
 }
 
+/** Every move that is the same dance as move i — a chorus is named once, not twelve times. */
+function groupOf(i) {
+  if (i == null) return [];
+  const segs = A.song?.chart?.segments || [];
+  const sel = segs.find((x) => x.i === i);
+  if (!sel || sel.rest || sel.group == null) return sel ? [i] : [];
+  return segs.filter((x) => x.group === sel.group).map((x) => x.i);
+}
+
 function renderMoves() {
   const s = A.song;
   if (!s) return;
   const { segs, loose } = segInfo();
-  $('#movesSub').textContent = s.chart ? `${s.title} · built from ${s.chart.report.takes} take${s.chart.report.takes > 1 ? 's' : ''} · ${s.chart.report.scoredMoves} scored moves` : `${s.title} · no takes yet`;
+  const groups = s.chart?.report.moveGroups;
+  $('#movesSub').textContent = s.chart
+    ? `${s.title} · built from ${s.chart.report.takes} take${s.chart.report.takes > 1 ? 's' : ''} · ${s.chart.report.scoredMoves} scored moves${groups ? `, ${groups} of them different` : ''}`
+    : `${s.title} · no takes yet`;
   const tl = $('#timeline');
   tl.replaceChildren();
   if (!segs.length) tl.append(el('div', { class: 'empty', style: { flexGrow: 1, padding: '18px' } }, 'Record a take first — moves appear here.'));
   if (A.selSeg == null || !segs.some((x) => x.i === A.selSeg)) A.selSeg = segs.find((x) => !x.rest)?.i ?? null;
+  const repeats = new Set(groupOf(A.selSeg));
   for (const x of segs) {
+    const repeat = x.i !== A.selSeg && repeats.has(x.i);
     tl.append(el('button', {
-      'aria-label': `Move ${x.i + 1}${x.rest ? ' (rest)' : ''}`, 'aria-pressed': String(x.i === A.selSeg),
-      style: { background: x.rest ? 'var(--surface-2)' : loose(x) ? 'var(--gold)' : 'var(--teal)' },
+      'aria-label': `Move ${x.i + 1}${x.rest ? ' (rest)' : repeat ? ' (same dance as the selected move)' : ''}`,
+      'aria-pressed': String(x.i === A.selSeg),
+      style: { background: x.rest ? 'var(--surface-2)' : repeat ? 'var(--violet)' : loose(x) ? 'var(--gold)' : 'var(--teal)' },
       onclick: () => { A.selSeg = x.i; renderMoves(); },
     }));
   }
@@ -428,7 +502,8 @@ function renderMoves() {
     const [miss, total] = x.miss || [0, 0];
     rows.append(el('tr', { class: x.i === A.selSeg ? 'sel' : '', onclick: () => { A.selSeg = x.i; renderMoves(); } },
       el('td', {}, String(x.i + 1)),
-      el('td', { style: { fontWeight: 600 } }, x.rest ? 'Rest' : moves[x.i]?.name || `Move ${x.i + 1}`),
+      el('td', { style: { fontWeight: 600 } }, x.rest ? 'Rest' : moves[x.i]?.name || `Move ${x.i + 1}`,
+        x.rest || groupOf(x.i).length < 2 ? null : el('span', { class: 'muted', style: { fontWeight: 400, fontSize: '12px' } }, ` ×${groupOf(x.i).length}`)),
       el('td', { class: 'muted' }, `${(x.start / 1000).toFixed(1)} s`),
       el('td', {}, el('span', { class: `chip ${kind[1]}` }, kind[0])),
       el('td', {}, x.rest ? '—' : total ? `${Math.round((miss / total) * 100)}%` : 'no plays yet')));
@@ -441,8 +516,15 @@ function renderMoveEditor() {
   const s = A.song;
   const x = s.chart?.segments.find((q) => q.i === A.selSeg);
   const disabled = !x || x.rest;
-  for (const id of ['mvName', 'mvStrict', 'mvAuto']) $(`#${id}`).disabled = disabled;
-  if (!x) { $('#mvHead').textContent = 'No move selected'; $('#mvIcons').replaceChildren(); return; }
+  for (const id of ['mvName', 'mvStrict', 'mvAuto', 'mvCopyPrev']) $(`#${id}`).disabled = disabled;
+  if (!x) { $('#mvHead').textContent = 'No move selected'; $('#mvIcons').replaceChildren(); $('#mvRepeats').hidden = true; return; }
+  const others = groupOf(x.i).filter((i) => i !== x.i);
+  const rp = $('#mvRepeats');
+  rp.hidden = disabled || !others.length;
+  if (!rp.hidden) {
+    const at = others.map((i) => fmtTime(s.chart.segments.find((q) => q.i === i).start));
+    rp.textContent = `The same dance happens ${others.length} more time${others.length > 1 ? 's' : ''} (${at.slice(0, 4).join(', ')}${others.length > 4 ? ', …' : ''}). Naming it here names every one of them.`;
+  }
   const mv = s.moves?.[x.i] || {};
   $('#mvHead').textContent = `Move ${x.i + 1} · ${(x.start / 1000).toFixed(1)} – ${(x.end / 1000).toFixed(1)} s${x.rest ? ' · rest (not scored)' : ''}`;
   $('#mvName').value = mv.name || '';
@@ -458,22 +540,33 @@ function renderMoveEditor() {
 }
 
 let saveTimer;
-async function saveMove(patch) {
+/** A patch lands on every repeat of the selected move. `live` is for typing: redrawing the
+ *  table mid-keystroke would fight the caret, so the redraw waits for the save. */
+function saveMove(patch, { live = false } = {}) {
   const s = A.song;
-  const i = A.selSeg;
+  const idx = groupOf(A.selSeg);
+  if (!idx.length) return;
   const moves = { ...(s.moves || {}) };
-  moves[i] = { name: '', icon: null, strict: 1, ...moves[i], ...patch };
+  for (const i of idx) moves[i] = { name: '', icon: null, strict: 1, ...moves[i], ...patch };
   s.moves = moves;
-  renderMoves();
+  if (!live) renderMoves();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
-    try { await adm(`/api/songs/${s.id}`, { method: 'PATCH', body: { moves } }); }
-    catch (e) { toast(`Not saved: ${e.message}`); }
-  }, 400);
+    try {
+      await adm(`/api/songs/${s.id}`, { method: 'PATCH', body: { moves } });
+      if (live) renderMoves();
+    } catch (e) { toast(`Not saved: ${e.message}`); }
+  }, live ? 600 : 400);
 }
-$('#mvName').addEventListener('input', (e) => { const s = A.song; const i = A.selSeg; s.moves = { ...(s.moves || {}), [i]: { icon: null, strict: 1, ...(s.moves?.[i] || {}), name: e.target.value } }; clearTimeout(saveTimer); saveTimer = setTimeout(() => adm(`/api/songs/${s.id}`, { method: 'PATCH', body: { moves: s.moves } }).then(() => renderMoves()).catch((x) => toast(x.message)), 600); });
+$('#mvName').addEventListener('input', (e) => saveMove({ name: e.target.value }, { live: true }));
 $('#mvStrict').addEventListener('change', (e) => saveMove({ strict: sliderToStrict(Number(e.target.value)) }));
 $('#mvAuto').addEventListener('click', () => saveMove({ strict: 1 }));
+$('#mvCopyPrev').addEventListener('click', () => {
+  const prev = (A.song?.chart?.segments || []).filter((x) => !x.rest && x.i < A.selSeg).reverse().find((x) => A.song.moves?.[x.i]?.name);
+  if (!prev) return toast('No earlier move has a name yet');
+  const mv = A.song.moves[prev.i];
+  saveMove({ name: mv.name, icon: mv.icon });
+});
 
 function renderChecklist() {
   const s = A.song;
@@ -483,7 +576,7 @@ function renderChecklist() {
   const odd = (s.chart?.report.takeScores || []).filter((t) => t.odd).length;
   const items = [
     [!!s.audio, s.audio ? 'Audio uploaded' : 'Upload the audio'],
-    [takes >= 3, takes >= 3 ? `${takes} takes used` : `${takes} of 3 recommended takes`, takes > 0],
+    [takes >= 3, takes >= 3 ? `${takes} takes — strictness measured from them` : takes ? `${takes} take${takes > 1 ? 's' : ''} — playable, strictness is a default` : 'No takes yet', takes > 0],
     [!!s.videoTake, s.videoTake ? 'Reference video chosen' : 'No reference video (players see move cards)', true],
     [!!s.cover, s.cover ? 'Cover image set' : 'No cover image (a colour block is used)', true],
     [!odd, odd ? `${odd} take${odd > 1 ? 's' : ''} disagree with the others` : 'Takes agree with each other', true],

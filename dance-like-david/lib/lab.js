@@ -11,7 +11,7 @@ import { readJson, writeJson, updateJson, createJson, withLock } from './fsjson.
 const ICONS = ['left', 'right', 'up', 'down', 'spin', 'wave', 'clap', 'punch'];
 const LEAD_MS = 600; // takes and attempts are recorded from -LEAD_MS to duration + LEAD_MS
 
-export async function createLab({ dataDir, isAdmin, accounts, limit, bearer }) {
+export async function createLab({ dataDir, isAdmin, admin, accounts, limit, bearer }) {
   const root = path.join(dataDir, 'moves');
   await fsp.mkdir(root, { recursive: true });
   const attemptsFile = path.join(dataDir, 'lab.jsonl');
@@ -84,7 +84,6 @@ export async function createLab({ dataDir, isAdmin, accounts, limit, bearer }) {
   const r = express.Router();
   const json = express.json({ limit: '5mb' });
   const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-  const admin = (req, res, next) => (isAdmin(req) ? next() : res.status(401).json({ error: 'Admin password required' }));
   const withMove = wrap(async (req, res, next) => {
     const m = await getMeta(req.params.id);
     if (!m || (!m.published && !isAdmin(req))) return res.status(404).json({ error: 'Move not found' });

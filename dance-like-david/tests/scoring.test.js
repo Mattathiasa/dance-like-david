@@ -1,7 +1,7 @@
 // Phase 6 (simulated): does the scoring engine tell good dancing from bad?
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildChart, scoreDetail, alignTakes, accuracyFromRatio, validChart, intensityCurve } from '../shared/motion.js';
+import { buildChart, scoreDetail, alignTakes, accuracyFromRatio, validChart, intensityCurve, groupSegments } from '../shared/motion.js';
 import { makeDancer, samplesFor } from './sim.js';
 
 const meta = { id: 'x', bpm: 120, beatsPerMove: 4, firstBeatMs: 0, durationMs: 16000 };
@@ -64,6 +64,18 @@ test('a chart the phones can trust passes validChart, a broken one does not', ()
   const bad = { ...chart, segments: [{ ...chart.segments[0], ref: [1, 2, NaN] }] };
   assert.ok(!validChart(bad));
   assert.ok(!validChart({ ...chart, segments: [{ ...chart.segments[0], tol: 0 }] }));
+});
+
+// The simulated choreography reuses the same dance for moves 0 and 6, so grouping has a
+// right answer: those two together, the other four on their own.
+test('repeated moves are grouped, different ones are not', () => {
+  const g = groupSegments(buildChart(meta, [1, 2, 3, 4].map((n) => ({ n, samples: samplesFor(makeDancer('good', n * 7), -800, 16800) }))));
+  const seg = (i) => g.segments.find((s) => s.i === i);
+  assert.equal(seg(0).group, seg(6).group, 'moves 0 and 6 are the same dance');
+  assert.notEqual(seg(1).group, seg(2).group, 'moves 1 and 2 are different dances');
+  assert.equal(seg(3).group, undefined, 'rests are not grouped');
+  assert.equal(g.report.moveGroups, 5, 'six scored moves, five distinct dances');
+  assert.ok(validChart(g), 'grouping leaves a chart the phones still accept');
 });
 
 test('the reference-vs-you curve draws both lines', () => {

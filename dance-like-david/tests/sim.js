@@ -29,7 +29,8 @@ export function samplesFor(fn, from, to, hz = 60) {
   return out;
 }
 
-/** A 16-bit mono WAV click track (so tests don't need a real song file). */
+/** A 16-bit mono WAV click track with accented downbeats (so tests don't need a real song file,
+ *  and so beat detection has an unambiguous first beat to find). */
 export function clickTrack(seconds = 20, bpm = 120, sr = 8000) {
   const n = sr * seconds;
   const buf = Buffer.alloc(44 + n * 2);
@@ -40,7 +41,8 @@ export function clickTrack(seconds = 20, bpm = 120, sr = 8000) {
   const beat = (sr * 60) / bpm;
   for (let i = 0; i < n; i++) {
     const env = Math.exp(-(i % beat) / (sr * 0.03));
-    buf.writeInt16LE(Math.round(0.5 * env * Math.sin((2 * Math.PI * 880 * i) / sr) * 32767), 44 + i * 2);
+    const accent = Math.floor(i / beat) % 4 === 0 ? 1 : 0.45;
+    buf.writeInt16LE(Math.round(0.5 * accent * env * Math.sin((2 * Math.PI * 880 * i) / sr) * 32767), 44 + i * 2);
   }
   return buf;
 }

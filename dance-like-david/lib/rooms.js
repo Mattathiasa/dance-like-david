@@ -11,10 +11,25 @@ const MAX_PLAYERS = 8;
 const MAX_GRADE_SAMPLES = 3000;
 const MAX_BAD_JOINS = 10; // per socket, before we stop guessing codes for it
 const MAX_ROOMS = 200; // a host that never disconnects would otherwise keep its room forever
+const MAX_BAD_PASS = 10; // wrong studio passwords per IP per minute
+const BAD_PASS_WINDOW = 60_000;
 
 export function attachRooms(server, { adminPassword, accounts, results, getSong, getChart }) {
   const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024 * 1024 });
   const rooms = new Map(); // code -> room
+  const passFails = new Map(); // ip -> when it last guessed the studio password wrong
+  // Hosting the studio is full admin, so guessing its password costs the same here as over HTTP.
+  const samePass = (given) => {
+    const a = Buffer.from(String(given ?? '')), b = Buffer.from(adminPassword);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  };
+  const tooManyBadPass = (ip) => {
+    const t = Date.now();
+    const h = (passFails.get(ip) || []).filter((x) => x > t - BAD_PASS_WINDOW);
+    h.push(t);
+    passFails.set(ip, h);
+    return h.length > MAX_BAD_PASS;
+  };
   const now = () => performance.timeOrigin + performance.now();
   const send = (ws, msg) => ws && ws.readyState === 1 && ws.send(JSON.stringify(msg));
   const secret = () => crypto.randomBytes(12).toString('hex');
@@ -110,6 +125,7 @@ export function attachRooms(server, { adminPassword, accounts, results, getSong,
   wss.on('connection', (ws, req) => {
     ws.isAlive = true;
     ws.badJoins = 0;
+    ws.ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress;
     ws.on('pong', () => (ws.isAlive = true));
     ws.ctx = {};
 
@@ -124,7 +140,11 @@ export function attachRooms(server, { adminPassword, accounts, results, getSong,
           return send(ws, { t: 'pong', c: m.c, s: now() });
 
         case 'host': {
-          if (m.kind === 'studio' && m.pass !== adminPassword) return send(ws, { t: 'error', error: 'bad admin password' });
+          if (m.kind === 'studio' && !samePass(m.pass)) {
+            return send(ws, tooManyBadPass(ws.ip)
+              ? { t: 'error', error: 'Too many wrong passwords — wait a minute' }
+              : { t: 'error', error: 'bad admin password' });
+          }
           if (rooms.size >= MAX_ROOMS) return send(ws, { t: 'error', error: 'The server is hosting too many rooms — try again shortly' });
           const code = newCode();
           const r = { code, kind: m.kind === 'studio' ? 'studio' : 'game', host: ws, hostSecret: secret(), players: new Map(), game: null };
@@ -247,6 +267,8 @@ export function attachRooms(server, { adminPassword, accounts, results, getSong,
   });
 
   const hb = setInterval(() => {
+    const stale = Date.now() - BAD_PASS_WINDOW;
+    for (const [ip, v] of passFails) if (!v.some((x) => x > stale)) passFails.delete(ip);
     for (const ws of wss.clients) {
       if (!ws.isAlive) { ws.terminate(); continue; }
       ws.isAlive = false;

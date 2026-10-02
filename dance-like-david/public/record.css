@@ -1,0 +1,16 @@
+/* Record (phone-only song authoring). Builds on lab.css; only the pieces the Lab has no use for. */
+.grid-check { display: block; width: 100%; height: 72px; border-radius: 12px; background: var(--surface-2); }
+.grid-row { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.grid-row button { min-width: 44px; min-height: 40px; padding: 0 10px; }
+.detected { display: flex; flex-direction: column; gap: 2px; }
+.detected b { font-size: 26px; font-family: var(--display, inherit); color: var(--gold); }
+.detected span { font-size: 13px; color: var(--muted); }
+.range-list { display: flex; flex-direction: column; gap: 6px; max-height: 42vh; overflow: auto; }
+.range-list button { display: flex; align-items: center; gap: 10px; text-align: left; min-height: 48px; padding: 8px 12px; }
+.range-list button[aria-pressed="true"] { border-color: var(--gold); }
+.range-list .t { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; min-width: 76px; }
+.seg-bar { display: flex; gap: 2px; height: 26px; }
+.seg-bar span { flex: 1; border-radius: 3px; background: var(--surface-2); }
+.scores { width: 100%; border-collapse: collapse; font-size: 14px; }
+.scores th, .scores td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.scores th { color: var(--muted); font-size: 12px; font-weight: 600; }
