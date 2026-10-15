@@ -194,12 +194,12 @@ function gripArt(progress = 0) {
   const NS = 'http://www.w3.org/2000/svg';
   const mk = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
   const phone = mk('svg', { width: 170, height: 250, viewBox: '0 0 90 140', 'aria-hidden': 'true' });
-  phone.append(mk('rect', { x: 24, y: 6, width: 42, height: 80, rx: 8, fill: '#2A1D4D', stroke: '#F2C14E', 'stroke-width': 3 }),
-    mk('rect', { x: 30, y: 14, width: 30, height: 62, rx: 3, fill: '#3B2C66' }),
-    mk('path', { d: 'M20 66c-5 26 6 50 14 66h36c8-24 8-44 2-58l-6-6V56l-7 2v-6l-7 2v-4l-7 2v-8l-8 2z', fill: '#D9A77E' }));
+  phone.append(mk('rect', { x: 24, y: 6, width: 42, height: 80, rx: 8, fill: '#431518', stroke: '#E1CAA5', 'stroke-width': 3 }),
+    mk('rect', { x: 30, y: 14, width: 30, height: 62, rx: 3, fill: '#160607' }),
+    mk('path', { d: 'M20 66c-5 26 6 50 14 66h36c8-24 8-44 2-58l-6-6V56l-7 2v-6l-7 2v-4l-7 2v-8l-8 2z', fill: '#E1CAA5' }));
   const ring = mk('svg', { width: 220, height: 220, viewBox: '0 0 100 100', class: 'ring', 'aria-hidden': 'true' });
-  ring.append(mk('circle', { cx: 50, cy: 50, r: 46, fill: 'none', stroke: '#2A1D4D', 'stroke-width': 4 }),
-    mk('circle', { class: 'prog', cx: 50, cy: 50, r: 46, fill: 'none', stroke: '#3DD9B5', 'stroke-width': 4, 'stroke-linecap': 'round', 'stroke-dasharray': 289, 'stroke-dashoffset': 289 * (1 - progress), transform: 'rotate(-90 50 50)' }));
+  ring.append(mk('circle', { cx: 50, cy: 50, r: 46, fill: 'none', stroke: '#431518', 'stroke-width': 4 }),
+    mk('circle', { class: 'prog', cx: 50, cy: 50, r: 46, fill: 'none', stroke: '#991B20', 'stroke-width': 4, 'stroke-linecap': 'round', 'stroke-dasharray': 289, 'stroke-dashoffset': 289 * (1 - progress), transform: 'rotate(-90 50 50)' }));
   wrap.append(phone, ring);
 }
 gripArt(0);

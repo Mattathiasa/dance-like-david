@@ -10,7 +10,7 @@ export function drawBeatGrid(canvas, { onset, onsetHz, bpm, firstBeatMs = 0, bea
   const g = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   g.clearRect(0, 0, W, H);
-  g.fillStyle = cssVar('--surface-2', '#2A1D4D');
+  g.fillStyle = cssVar('--surface-2', '#431518');
   g.fillRect(0, 0, W, H);
   if (!onset?.length) return;
   // No tempo yet is exactly when seeing the music helps most, so the curve is drawn either way
@@ -22,7 +22,7 @@ export function drawBeatGrid(canvas, { onset, onsetHz, bpm, firstBeatMs = 0, bea
 
   let peak = 0.001;
   for (let i = Math.floor(from / msPerFrame); i < (from + span) / msPerFrame && i < onset.length; i++) peak = Math.max(peak, onset[i]);
-  g.fillStyle = cssVar('--muted', '#9A8FB8');
+  g.fillStyle = cssVar('--muted', '#E1CAA5');
   for (let x = 0; x < W; x++) {
     const a = Math.floor((from + (x / W) * span) / msPerFrame);
     const b = Math.max(a + 1, Math.floor((from + ((x + 1) / W) * span) / msPerFrame));
@@ -32,7 +32,7 @@ export function drawBeatGrid(canvas, { onset, onsetHz, bpm, firstBeatMs = 0, bea
     g.fillRect(x, H - h, 1, h);
   }
   if (!beatMs) return;
-  const gold = cssVar('--gold', '#F2C14E');
+  const gold = cssVar('--gold', '#E1CAA5');
   for (let k = 0; ; k++) {
     const t = firstBeatMs + k * beatMs;
     if (t >= from + span) break;

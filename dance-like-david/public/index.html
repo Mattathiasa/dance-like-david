@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#140C26">
+<meta name="theme-color" content="#160607">
 <title>Dance Like David</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,40 +11,93 @@
 <link rel="stylesheet" href="/style.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
-  .home { max-width: 1100px; margin: 0 auto; padding: 56px 16px; display: flex; flex-direction: column; gap: 40px; }
-  .hero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-  .hero h1 { font-size: clamp(44px, 8vw, 80px); }
-  .hero p { color: var(--muted); font-size: 18px; max-width: 560px; }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-  .tiles a { display: flex; flex-direction: column; gap: 10px; padding: 28px; border-radius: 24px; background: var(--surface); border: 1px solid var(--line); color: var(--text); text-decoration: none; transition: border-color .15s; }
-  .tiles a:hover { border-color: var(--gold); color: var(--text); }
-  .tiles svg { color: var(--gold); }
-  .tiles h2 { font-size: 26px; }
-  .tiles p { color: var(--muted); }
+  .home { max-width: 1120px; margin: 0 auto; padding: 64px 20px 80px; display: flex; flex-direction: column; gap: 48px; }
+  .hero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px; position: relative; }
+  .crown-wrap {
+    position: relative; width: 88px; height: 88px; display: flex; align-items: center; justify-content: center;
+    border-radius: 28px; background: rgba(98, 32, 33, 0.45); border: 1px solid rgba(225, 202, 165, 0.35);
+    box-shadow: 0 0 32px rgba(153, 27, 32, 0.4), inset 0 0 20px rgba(225, 202, 165, 0.1);
+    margin-bottom: 4px;
+  }
+  .crown-wrap svg { filter: drop-shadow(0 2px 8px rgba(225, 202, 165, 0.4)); }
+  .hero h1 {
+    font-size: clamp(48px, 8.5vw, 84px);
+    background: linear-gradient(135deg, #FEF9DE 20%, #E1CAA5 75%, #991B20 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 4px 18px rgba(98, 32, 33, 0.45));
+  }
+  .hero p { color: var(--muted); font-size: 19px; max-width: 580px; line-height: 1.5; text-wrap: balance; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  .tiles a {
+    display: flex; flex-direction: column; gap: 14px; padding: 32px 28px; border-radius: 24px;
+    background: linear-gradient(145deg, rgba(46, 14, 16, 0.78), rgba(26, 7, 8, 0.88));
+    border: 1px solid rgba(98, 32, 33, 0.9);
+    color: var(--text); text-decoration: none;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 10px 30px -10px rgba(10, 2, 3, 0.8);
+    transition: transform 0.22s cubic-bezier(.2, 1, .3, 1), border-color 0.22s ease, box-shadow 0.22s ease;
+  }
+  .tiles a:hover {
+    transform: translateY(-5px);
+    border-color: var(--egypt);
+    box-shadow: 0 16px 40px -10px rgba(153, 27, 32, 0.45), 0 0 0 1px var(--egypt);
+    color: var(--seafoam);
+  }
+  .tile-icon {
+    width: 56px; height: 56px; border-radius: 16px;
+    background: rgba(98, 32, 33, 0.6);
+    border: 1px solid rgba(225, 202, 165, 0.25);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--egypt);
+    transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  }
+  .tiles a:hover .tile-icon {
+    background: var(--crimson);
+    color: var(--seafoam);
+    border-color: var(--seafoam);
+    transform: scale(1.06);
+    box-shadow: 0 4px 16px rgba(153, 27, 32, 0.5);
+  }
+  .tiles h2 { font-size: 26px; color: var(--seafoam); font-weight: 800; letter-spacing: -0.01em; }
+  .tiles p { color: var(--muted); font-size: 15px; line-height: 1.5; }
 </style>
 </head>
 <body>
 <main class="home">
   <div class="hero">
-    <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#F2C14E" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3 19h18M4 16.5L3 7l5 4 4-7 4 7 5-4-1 9.5z"/></svg>
+    <div class="crown-wrap">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#E1CAA5" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3 19h18M4 16.5L3 7l5 4 4-7 4 7 5-4-1 9.5z"/></svg>
+    </div>
     <h1>Dance Like David</h1>
     <p>Your phone is the controller. K-pop, pop, Afrobeats, worship — every style is welcome.</p>
   </div>
   <div class="tiles">
     <a href="/screen">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18v12H3zM8 21h8M12 17v4"/></svg>
+      <div class="tile-icon">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18v12H3zM8 21h8M12 17v4"/></svg>
+      </div>
       <h2>Big screen</h2><p>Open on a TV or laptop. Pick a song, show the room code, and play.</p></a>
     <a href="/phone">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2h8a2.5 2.5 0 012.5 2.5v15A2.5 2.5 0 0116 22H8a2.5 2.5 0 01-2.5-2.5v-15A2.5 2.5 0 018 2zM11 18h2"/></svg>
+      <div class="tile-icon">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2h8a2.5 2.5 0 012.5 2.5v15A2.5 2.5 0 0116 22H8a2.5 2.5 0 01-2.5-2.5v-15A2.5 2.5 0 018 2zM11 18h2"/></svg>
+      </div>
       <h2>I’m dancing</h2><p>Open on your phone, enter the code, and hold the phone in your right hand.</p></a>
     <a href="/lab">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0114-5.3M20 4v5h-5M20 12a8 8 0 01-14 5.3M4 20v-5h5"/></svg>
+      <div class="tile-icon">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0114-5.3M20 4v5h-5M20 12a8 8 0 01-14 5.3M4 20v-5h5"/></svg>
+      </div>
       <h2>Move Lab</h2><p>Phone only. Try a single move and get a score out of 100 with tips.</p></a>
     <a href="/record">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2h8a2.5 2.5 0 012.5 2.5v15A2.5 2.5 0 0116 22H8a2.5 2.5 0 01-2.5-2.5v-15A2.5 2.5 0 018 2z"/><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/></svg>
+      <div class="tile-icon">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2h8a2.5 2.5 0 012.5 2.5v15A2.5 2.5 0 0116 22H8a2.5 2.5 0 01-2.5-2.5v-15A2.5 2.5 0 018 2z"/><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/></svg>
+      </div>
       <h2>Record a song</h2><p>Admin only. Phone only — it plays the song and records the dance.</p></a>
     <a href="/studio">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v13H3zM12 17a4 4 0 100-8 4 4 0 000 8z"/></svg>
+      <div class="tile-icon">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v13H3zM12 17a4 4 0 100-8 4 4 0 000 8z"/></svg>
+      </div>
       <h2>Studio</h2><p>Admin only. Name the moves, add a reference video, manage the library.</p></a>
   </div>
 </main>

@@ -266,7 +266,7 @@ async function showResult(samples, mode) {
   const ring = document.createElementNS(NS, 'svg');
   ring.setAttribute('viewBox', '0 0 200 200');
   ring.setAttribute('aria-hidden', 'true');
-  ring.innerHTML = `<circle cx="100" cy="100" r="88" fill="none" stroke="#2A1D4D" stroke-width="14"/><circle cx="100" cy="100" r="88" fill="none" stroke-width="14" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C}" style="transition:stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1);stroke:${GRADE_VAR[r.name]}"/>`;
+  ring.innerHTML = `<circle cx="100" cy="100" r="88" fill="none" stroke="var(--surface-2)" stroke-width="14"/><circle cx="100" cy="100" r="88" fill="none" stroke-width="14" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C}" style="transition:stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1);stroke:${GRADE_VAR[r.name]}"/>`;
   requestAnimationFrame(() => requestAnimationFrame(() => ring.lastChild.setAttribute('stroke-dashoffset', String(C * (1 - r.score / 100)))));
   const timing = ['no-data', 'still', 'shaky'].includes(r.reason) ? '—' : Math.abs(r.lagMs) < 120 ? 'On time' : `${(Math.abs(r.lagMs) / 1000).toFixed(1)} s ${r.lagMs > 0 ? 'late' : 'early'}`;
   const size = r.size && r.reason !== 'no-data' ? `${Math.round(r.size * 100)}%` : '—';
