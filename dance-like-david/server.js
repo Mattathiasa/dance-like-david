@@ -18,7 +18,7 @@ import { createLab } from './lib/lab.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
-const DATA = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
+const DATA = path.resolve(process.env.DATA_DIR || (process.env.VERCEL ? path.join('/tmp', 'data') : path.join(__dirname, 'data')));
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'david';
 if (!process.env.ADMIN_PASSWORD) console.warn('[warn] ADMIN_PASSWORD not set — using "david". Set it before deploying.');
 
@@ -26,7 +26,11 @@ export const GENRES = ['K-pop', 'Pop', 'Afrobeats', 'Worship', 'Kids', 'Other'];
 export const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
 export const ICONS = ['left', 'right', 'up', 'down', 'spin', 'wave', 'clap', 'punch'];
 
-await fsp.mkdir(path.join(DATA, 'songs'), { recursive: true });
+await fsp.mkdir(path.join(DATA, 'songs'), { recursive: true }).catch(() => {});
+if (process.env.VERCEL) {
+  const seed = path.join(__dirname, 'data');
+  if (fs.existsSync(seed)) await fsp.cp(seed, DATA, { recursive: true, force: false }).catch(() => {});
+}
 const accounts = await createAccounts(DATA);
 const results = await createResults(DATA);
 
@@ -174,8 +178,10 @@ app.use((req, res, next) => {
   if (req.secure) res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   next();
 });
-app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
-app.use('/shared', express.static(path.join(__dirname, 'shared')));
+const staticRoot = fs.existsSync(path.join(__dirname, 'public')) ? path.join(__dirname, 'public') : path.join(process.cwd(), 'public');
+const sharedRoot = fs.existsSync(path.join(__dirname, 'shared')) ? path.join(__dirname, 'shared') : path.join(process.cwd(), 'shared');
+app.use(express.static(staticRoot, { extensions: ['html'] }));
+app.use('/shared', express.static(sharedRoot));
 
 const json = express.json({ limit: '50mb' });
 const raw = (limit) => express.raw({ type: () => true, limit });
@@ -464,12 +470,16 @@ const server = hasCerts
 
 attachRooms(server, { adminPassword: ADMIN_PASSWORD, accounts, results, getSong: getMeta, getChart: loadChart });
 
-server.listen(PORT, () => {
-  console.log(`Dance Like David on ${hasCerts ? 'https' : 'http'}://localhost:${PORT}`);
-  console.log('  TV: /screen   Phone: /phone   Studio: /studio');
-  if (!hasCerts) console.log('  Phones need HTTPS for motion sensors — see README (tunnel or certs/).');
-});
+if (!process.env.VERCEL) {
+  server.listen(PORT, () => {
+    console.log(`Dance Like David on ${hasCerts ? 'https' : 'http'}://localhost:${PORT}`);
+    console.log('  TV: /screen   Phone: /phone   Studio: /studio');
+    if (!hasCerts) console.log('  Phones need HTTPS for motion sensors — see README (tunnel or certs/).');
+  });
 
-const shutdown = () => { console.log('Shutting down'); server.close(() => process.exit(0)); setTimeout(() => process.exit(0), 3000).unref(); };
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+  const shutdown = () => { console.log('Shutting down'); server.close(() => process.exit(0)); setTimeout(() => process.exit(0), 3000).unref(); };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
+}
+
+export default app;

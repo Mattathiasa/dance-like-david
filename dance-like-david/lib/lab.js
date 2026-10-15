@@ -13,7 +13,7 @@ const LEAD_MS = 600; // takes and attempts are recorded from -LEAD_MS to duratio
 
 export async function createLab({ dataDir, isAdmin, admin, accounts, limit, bearer }) {
   const root = path.join(dataDir, 'moves');
-  await fsp.mkdir(root, { recursive: true });
+  await fsp.mkdir(root, { recursive: true }).catch(() => {});
   const attemptsFile = path.join(dataDir, 'lab.jsonl');
   const attempts = [];
   // moveId -> { plays, best, byUser: Map<userId, { userId, name, score, at }> }
