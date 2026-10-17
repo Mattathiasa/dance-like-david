@@ -18,7 +18,7 @@ import { createLab } from './lib/lab.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
-const DATA = path.resolve(process.env.DATA_DIR || (process.env.VERCEL ? path.join('/tmp', 'data') : path.join(__dirname, 'data')));
+const DATA = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'david';
 if (!process.env.ADMIN_PASSWORD) console.warn('[warn] ADMIN_PASSWORD not set — using "david". Set it before deploying.');
 
@@ -27,10 +27,6 @@ export const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
 export const ICONS = ['left', 'right', 'up', 'down', 'spin', 'wave', 'clap', 'punch'];
 
 await fsp.mkdir(path.join(DATA, 'songs'), { recursive: true }).catch(() => {});
-if (process.env.VERCEL) {
-  const seed = path.join(__dirname, 'data');
-  if (fs.existsSync(seed)) await fsp.cp(seed, DATA, { recursive: true, force: false }).catch(() => {});
-}
 const accounts = await createAccounts(DATA);
 const results = await createResults(DATA);
 
@@ -183,7 +179,8 @@ const sharedRoot = fs.existsSync(path.join(__dirname, 'shared')) ? path.join(__d
 app.use(express.static(staticRoot, { extensions: ['html'] }));
 app.use('/shared', express.static(sharedRoot));
 
-const json = express.json({ limit: '50mb' });
+const json = express.json({ limit: '10mb' });
+const jsonSmall = express.json({ limit: '10kb' });
 const raw = (limit) => express.raw({ type: () => true, limit });
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -254,12 +251,12 @@ app.get('/api/qr', wrap(async (req, res) => {
 }));
 
 // ----- admin -----
-app.post('/api/login', json, (req, res, next) => { req.headers['x-admin-pass'] = req.body?.password || ''; next(); }, limit(10, 60000), admin,
+app.post('/api/login', jsonSmall, (req, res, next) => { req.headers['x-admin-pass'] = req.body?.password || ''; next(); }, limit(10, 60000), admin,
   (req, res) => res.json({ ok: true }));
 
 // ----- accounts -----
-app.post('/api/auth/register', limit(10, 60000), json, wrap(async (req, res) => res.json(await accounts.register(req.body || {}))));
-app.post('/api/auth/login', limit(10, 60000), json, wrap(async (req, res) => res.json(await accounts.login(req.body || {}))));
+app.post('/api/auth/register', limit(10, 60000), jsonSmall, wrap(async (req, res) => res.json(await accounts.register(req.body || {}))));
+app.post('/api/auth/login', limit(10, 60000), jsonSmall, wrap(async (req, res) => res.json(await accounts.login(req.body || {}))));
 app.post('/api/auth/logout', wrap(async (req, res) => { await accounts.logout(bearer(req)); res.json({ ok: true }); }));
 app.get('/api/me', user, (req, res) => res.json({ user: req.user, stats: results.userStats(req.user.id), lab: lab.userLabStats(req.user.id) }));
 app.get('/api/leaderboard', (req, res) => {
@@ -374,7 +371,7 @@ app.put('/api/songs/:id/cover', admin, withSong, raw('8mb'), wrap(async (req, re
 }));
 
 const publicOrAdmin = (req, res, next) => (req.meta.published || isAdmin(req) ? next() : res.status(404).end());
-app.get('/api/songs/:id/cover', withSong, (req, res) => {
+app.get('/api/songs/:id/cover', withSong, publicOrAdmin, (req, res) => {
   if (!req.meta.cover) return res.status(404).end();
   res.set('Cache-Control', 'public, max-age=300').sendFile(path.join(songDir(req.meta.id), req.meta.cover));
 });
@@ -470,16 +467,12 @@ const server = hasCerts
 
 attachRooms(server, { adminPassword: ADMIN_PASSWORD, accounts, results, getSong: getMeta, getChart: loadChart });
 
-if (!process.env.VERCEL) {
-  server.listen(PORT, () => {
-    console.log(`Dance Like David on ${hasCerts ? 'https' : 'http'}://localhost:${PORT}`);
-    console.log('  TV: /screen   Phone: /phone   Studio: /studio');
-    if (!hasCerts) console.log('  Phones need HTTPS for motion sensors — see README (tunnel or certs/).');
-  });
+server.listen(PORT, () => {
+  console.log(`Dance Like David on ${hasCerts ? 'https' : 'http'}://localhost:${PORT}`);
+  console.log('  TV: /screen   Phone: /phone   Studio: /studio');
+  if (!hasCerts) console.log('  Phones need HTTPS for motion sensors — see README (tunnel or certs/).');
+});
 
-  const shutdown = () => { console.log('Shutting down'); server.close(() => process.exit(0)); setTimeout(() => process.exit(0), 3000).unref(); };
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
-}
-
-export default app;
+const shutdown = () => { console.log('Shutting down'); server.close(() => process.exit(0)); setTimeout(() => process.exit(0), 3000).unref(); };
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

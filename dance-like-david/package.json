@@ -2,6 +2,7 @@
   "name": "dance-like-david",
   "version": "0.1.0",
   "description": "Dance Like David — a Just Dance-style game where your phone is the controller.",
+  "license": "MIT",
   "type": "module",
   "main": "server.js",
   "scripts": {

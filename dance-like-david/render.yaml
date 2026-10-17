@@ -1,16 +1,14 @@
-# Render.com blueprint: one web service with a persistent disk for songs, takes, accounts and scores.
+# Render.com blueprint: free-tier web service for a cost-free portfolio demo.
+# Trade-off, accepted on purpose: the free plan has no persistent disk, so songs, takes, accounts
+# and scores reset whenever the instance restarts, redeploys, or wakes from free-tier sleep — and
+# WebSocket connections can occasionally drop on a cold start. Fine for a demo link, not for real use.
+# Want real persistence instead? Switch `plan` to `starter` and add back a `disk:` block mounted at
+# a path matching DATA_DIR (paid plans only) — see README.md's Deploy section.
 services:
   - type: web
     name: dance-like-david
     runtime: docker
-    plan: starter            # persistent disks need a paid plan
     healthCheckPath: /api/health
     envVars:
       - key: ADMIN_PASSWORD
         sync: false          # set it in the dashboard
-      - key: DATA_DIR
-        value: /data
-    disk:
-      name: ddl-data
-      mountPath: /data
-      sizeGB: 5

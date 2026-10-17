@@ -47,7 +47,7 @@ A Just Dance-style multiplayer party game where your phone is the controller. Pl
 
 **DevOps & Deployment:**
 - [Docker](https://www.docker.com/) - Containerization (`Dockerfile` provided)
-- [Render](https://render.com/) - Blueprint deployment (`render.yaml` with persistent disk)
+- [Render](https://render.com/) - Blueprint deployment (`render.yaml`); the architecture supports a persistent disk for real use, but the live demo link runs on Render's free tier for cost reasons, so it resets between visits
 - HTTPS via local certs (`mkcert`) or tunneling (`cloudflared`) for DeviceMotion API access
 - Zero build step - runs directly with Node.js
 

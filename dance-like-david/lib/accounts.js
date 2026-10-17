@@ -23,9 +23,16 @@ export async function createAccounts(dataDir) {
     return token;
   }
 
-  // drop expired sessions on start
-  const cutoff = Date.now() - SESSION_DAYS * 864e5;
-  for (const [t, s] of Object.entries(db.sessions)) if (s.createdAt < cutoff) delete db.sessions[t];
+  const pruneSessions = async () => {
+    const cutoff = Date.now() - SESSION_DAYS * 864e5;
+    let changed = false;
+    for (const [t, s] of Object.entries(db.sessions)) if (s.createdAt < cutoff) { delete db.sessions[t]; changed = true; }
+    if (changed) await save();
+  };
+
+  // drop expired sessions on start, then periodically so they don't pile up between restarts
+  await pruneSessions();
+  setInterval(pruneSessions, 24 * 3600e3).unref();
 
   return {
     async register({ username, password, displayName }) {

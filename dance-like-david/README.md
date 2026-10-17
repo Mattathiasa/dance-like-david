@@ -2,6 +2,14 @@
 
 A Just Dance–style party game where **your phone is the controller**. Hold it in your right hand and dance: the phone's motion sensors score every move against a reference the admin recorded — on a phone, with no laptop in the room. K-pop, pop, Afrobeats, worship, kids — every style is welcome.
 
+<!-- Generate these with `npm run test:e2e`, then copy from tests/screenshots/ into docs/screenshots/:
+     07-tv-lobby.png → tv-lobby.png, 11-phone-dance.png → phone-dancing.png, 12-tv-results.png → tv-results.png -->
+<p align="center">
+  <img src="docs/screenshots/tv-lobby.png" width="32%" alt="Big screen lobby with QR code to join">
+  <img src="docs/screenshots/phone-dancing.png" width="32%" alt="Phone controller scoring a move live">
+  <img src="docs/screenshots/tv-results.png" width="32%" alt="Podium results on the big screen">
+</p>
+
 ## What's in it
 | Screen | Where | What it does |
 |---|---|---|
@@ -71,8 +79,9 @@ against what you hear before recording a take.
 
 ## Deploy
 - **Docker:** `docker build -t ddl . && docker run -p 3000:3000 -e ADMIN_PASSWORD=… -v ddl-data:/data ddl`
-- **Render:** `render.yaml` is a ready blueprint (web service + persistent disk). Set `ADMIN_PASSWORD` in the dashboard.
-- Any host works if it supports WebSockets and gives you a persistent disk for `DATA_DIR`.
+- **Render, free:** `render.yaml` is a ready blueprint for Render's free web service plan. Set `ADMIN_PASSWORD` in the dashboard. Free of charge, but with no persistent disk — songs, takes, accounts and scores reset whenever the instance restarts, redeploys, or wakes from sleep, and WebSocket connections can occasionally drop on a cold start. Fine for a demo link, not for a game night you care about keeping.
+- **Render, with real persistence:** switch `plan` to `starter` in `render.yaml` and add a `disk:` block mounted at a path matching `DATA_DIR` (paid plans only) for a web service that keeps its data across restarts and handles WebSockets reliably.
+- Any host works if it supports long-lived WebSocket connections and (optionally) a persistent disk for `DATA_DIR`.
 
 | Env var | Default | |
 |---|---|---|
